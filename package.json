@@ -1,0 +1,19 @@
+{
+  "name": "prometheus",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "app",
+    "backend"
+  ],
+  "scripts": {
+    "dev:app": "npm run dev --workspace=app",
+    "dev:backend": "npm run dev --workspace=backend",
+    "build:app": "npm run build --workspace=app",
+    "build:backend": "npm run build --workspace=backend",
+    "build": "npm run build:backend && npm run build:app",
+    "db:migrate": "npm run db:migrate --workspace=backend",
+    "db:generate": "npm run db:generate --workspace=backend",
+    "db:seed": "npm run db:seed --workspace=backend"
+  }
+}

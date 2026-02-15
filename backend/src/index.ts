@@ -1,0 +1,48 @@
+import express from "express";
+import cors from "cors";
+import { env } from "./config/env";
+import { errorHandler } from "./middleware/errorHandler";
+import portfolioRoutes from "./routes/portfolio";
+import transactionRoutes from "./routes/transactions";
+import tokenRoutes from "./routes/tokens";
+import analyticsRoutes from "./routes/analytics";
+import botRoutes from "./routes/bot";
+import activityRoutes from "./routes/activity";
+import scannerRoutes from "./routes/scanner";
+import { startScheduledJobs } from "./jobs";
+import { startStreamListener } from "./scanner/streamListener";
+
+const app = express();
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Health check
+app.get("/api/health", (_req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// Dashboard-facing routes
+app.use("/api/portfolio", portfolioRoutes);
+app.use("/api/transactions", transactionRoutes);
+app.use("/api/tokens", tokenRoutes);
+app.use("/api/analytics", analyticsRoutes);
+app.use("/api/activity", activityRoutes);
+
+// Bot-facing routes
+app.use("/api/bot", botRoutes);
+
+// Scanner routes
+app.use("/api/scanner", scannerRoutes);
+
+// Error handler
+app.use(errorHandler);
+
+app.listen(env.PORT, () => {
+  console.log(`[Server] Prometheus backend running on port ${env.PORT}`);
+
+  // Start background services
+  startScheduledJobs();
+  startStreamListener();
+});

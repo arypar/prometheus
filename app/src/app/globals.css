@@ -1,0 +1,221 @@
+@import "tailwindcss";
+
+@theme inline {
+  /* Prometheus Palette */
+  --color-obsidian: #07070A;
+  --color-charcoal: #101116;
+  --color-ash: #23242B;
+  --color-ivory: #F2F0E8;
+  --color-stone: #A7A397;
+  --color-torch-gold: #F6C65B;
+  --color-ember: #FF8A3D;
+  --color-flame: #FFD87A;
+  --color-prometheus-red: #B21E2B;
+  --color-smoke: #2A3B3A;
+
+  /* Semantic mappings */
+  --color-background: #07070A;
+  --color-foreground: #F2F0E8;
+  --color-card: #101116;
+  --color-card-foreground: #F2F0E8;
+  --color-border: #23242B;
+  --color-muted: #1a1a22;
+  --color-muted-foreground: #A7A397;
+
+  /* Fonts */
+  --font-display: "Cinzel", serif;
+  --font-heading: "Cormorant Garamond", serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+}
+
+body {
+  background-color: var(--color-obsidian);
+  color: var(--color-ivory);
+  font-family: var(--font-body);
+}
+
+/* Oil-canvas grain overlay */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-obsidian);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-ash);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-stone);
+}
+
+/* ---- Animations ---- */
+
+/* Flame flicker — torch gold accents */
+@keyframes flame-flicker {
+  0%, 100% { opacity: 1; }
+  25% { opacity: 0.85; }
+  50% { opacity: 0.95; }
+  75% { opacity: 0.8; }
+}
+
+.flame-flicker {
+  animation: flame-flicker 3s ease-in-out infinite;
+}
+
+/* Ember float — floating particles */
+@keyframes ember-float {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.8;
+  }
+  90% {
+    opacity: 0.3;
+  }
+  100% {
+    transform: translateY(-120vh) translateX(40px);
+    opacity: 0;
+  }
+}
+
+/* Card rise — entrance animation */
+@keyframes card-rise {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.card-rise {
+  animation: card-rise 0.5s ease-out forwards;
+}
+
+/* Divine breathe — hero headline */
+@keyframes divine-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+.divine-breathe {
+  animation: divine-breathe 6s ease-in-out infinite;
+}
+
+/* Smoke drift — background wisps */
+@keyframes smoke-drift {
+  0% { transform: translateX(-10%) translateY(5%); opacity: 0.03; }
+  50% { transform: translateX(10%) translateY(-5%); opacity: 0.06; }
+  100% { transform: translateX(-10%) translateY(5%); opacity: 0.03; }
+}
+
+/* Pulse glow for live indicators */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Smoke gradient background */
+.smoke-gradient {
+  background: radial-gradient(ellipse at 50% 40%, var(--color-charcoal) 0%, var(--color-obsidian) 70%);
+}
+
+/* Divider glyph */
+.divider-glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  color: var(--color-ash);
+  font-size: 0.75rem;
+  letter-spacing: 0.5em;
+  padding: 2rem 0;
+}
+
+.divider-glyph::before,
+.divider-glyph::after {
+  content: "";
+  flex: 1;
+  max-width: 120px;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--color-ash), transparent);
+}
+
+/* Terminal cursor blink */
+@keyframes terminal-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.terminal-blink {
+  animation: terminal-blink 1s step-end infinite;
+}
+
+/* Terminal line entry */
+@keyframes terminal-line-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.terminal-line-enter {
+  animation: terminal-line-enter 0.3s ease-out forwards;
+}
+
+/* Terminal glow border */
+.terminal-glow {
+  box-shadow: 0 0 15px rgba(246, 198, 91, 0.08), inset 0 0 15px rgba(246, 198, 91, 0.03);
+}
+
+/* Pipeline flow animation */
+@keyframes pipeline-flow {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.pipeline-flow {
+  background-size: 200% 100%;
+  animation: pipeline-flow 3s linear infinite;
+}
+
+/* Stage pulse for active pipeline stage */
+@keyframes stage-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(246, 198, 91, 0.3); }
+  50% { box-shadow: 0 0 12px 4px rgba(246, 198, 91, 0.15); }
+}
+
+.stage-pulse {
+  animation: stage-pulse 2s ease-in-out infinite;
+}
