@@ -124,13 +124,14 @@ export function PortfolioChart() {
   const gradientId = `portfolio-gradient-${period}`;
 
   const handleMouseMove = useCallback(
-    (state: { activePayload?: Array<{ payload: { value: number; time: string } }> }) => {
-      if (state?.activePayload?.[0]) {
-        const p = state.activePayload[0].payload;
+    (nextState: { activeTooltipIndex?: number | undefined }) => {
+      const idx = nextState?.activeTooltipIndex;
+      if (idx != null && typeof idx === "number" && chartData[idx]) {
+        const p = chartData[idx];
         setHoverData({ value: p.value, time: p.time });
       }
     },
-    [],
+    [chartData],
   );
 
   const handleMouseLeave = useCallback(() => {
