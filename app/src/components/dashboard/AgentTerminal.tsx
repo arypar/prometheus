@@ -5,106 +5,60 @@ import { useActivity } from "@/hooks/useData";
 import { useSSE } from "@/hooks/useSSE";
 import type { BotAction } from "@/types";
 
-const DEMO_LINES: BotAction[] = [
-  { id: "demo-1", action: "THINK", tokenAddress: null, details: null, txHash: null, reasoning: "Initializing neural pathways...", sentiment: null, confidence: null, phase: "SCAN", timestamp: new Date(Date.now() - 50000).toISOString() },
-  { id: "demo-2", action: "SCAN", tokenAddress: null, details: null, txHash: null, reasoning: "Scanning nad.fun for new token launches", sentiment: "NEUTRAL", confidence: null, phase: "SCAN", timestamp: new Date(Date.now() - 40000).toISOString() },
-  { id: "demo-3", action: "EVALUATE", tokenAddress: null, details: null, txHash: null, reasoning: "Analyzing holder distribution and liquidity depth", sentiment: "CAUTIOUS", confidence: 62, phase: "EVALUATE", timestamp: new Date(Date.now() - 30000).toISOString() },
-  { id: "demo-4", action: "THINK", tokenAddress: null, details: null, txHash: null, reasoning: "Market conditions volatile, tightening risk parameters", sentiment: "CAUTIOUS", confidence: null, phase: "EVALUATE", timestamp: new Date(Date.now() - 20000).toISOString() },
-  { id: "demo-5", action: "SKIP", tokenAddress: null, details: null, txHash: null, reasoning: "Insufficient liquidity for safe entry", sentiment: "BEARISH", confidence: 35, phase: "DECIDE", timestamp: new Date(Date.now() - 10000).toISOString() },
-];
+const MAX_LINES = 30;
 
-const MAX_LINES = 50;
-
-function SentimentDot({ sentiment }: { sentiment: string | null }) {
-  if (!sentiment) return null;
-  const color =
-    sentiment === "BULLISH" ? "bg-torch-gold" :
-    sentiment === "BEARISH" ? "bg-prometheus-red" :
-    "bg-stone";
-  return <span className={`inline-block w-1.5 h-1.5 rounded-full ${color} shrink-0`} />;
+function formatTime(ts: string): string {
+  return new Date(ts).toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
 }
 
-function ConfidenceBar({ confidence }: { confidence: number }) {
-  return (
-    <span className="inline-flex items-center gap-1 ml-1">
-      <span className="inline-block w-12 h-1 bg-ash rounded-full overflow-hidden">
-        <span
-          className="block h-full rounded-full bg-torch-gold/70"
-          style={{ width: `${Math.min(100, Math.max(0, confidence))}%` }}
-        />
-      </span>
-      <span className="text-[9px] text-stone">{Math.round(confidence)}</span>
-    </span>
-  );
+function actionTag(action: string): { label: string; color: string; bg: string } {
+  switch (action) {
+    case "BUY":
+      return { label: "BUY", color: "text-emerald-400", bg: "bg-emerald-400/10 border-emerald-400/30" };
+    case "SELL":
+      return { label: "SELL", color: "text-rose-400", bg: "bg-rose-400/10 border-rose-400/30" };
+    case "THINK":
+      return { label: "THINK", color: "text-violet-400", bg: "bg-violet-400/10 border-violet-400/30" };
+    case "EVALUATE":
+      return { label: "EVAL", color: "text-amber-400", bg: "bg-amber-400/10 border-amber-400/30" };
+    case "SCAN":
+      return { label: "SCAN", color: "text-cyan-400", bg: "bg-cyan-400/10 border-cyan-400/30" };
+    case "ERROR":
+      return { label: "ERR", color: "text-red-500", bg: "bg-red-500/10 border-red-500/30" };
+    case "SKIP":
+      return { label: "SKIP", color: "text-stone", bg: "bg-stone/10 border-stone/30" };
+    default:
+      return { label: action.slice(0, 4), color: "text-stone", bg: "bg-stone/10 border-stone/30" };
+  }
 }
 
-function formatTerminalLine(action: BotAction): { text: string; className: string; flashClass: string; isThinking: boolean } {
+function formatMessage(action: BotAction): string {
   const symbol = action.token?.symbol;
   const reasoning = action.reasoning;
 
   switch (action.action) {
-    case "THINK":
-      return {
-        text: reasoning || "Processing",
-        className: "text-stone italic",
-        flashClass: "",
-        isThinking: true,
-      };
-    case "SCAN":
-      return {
-        text: symbol ? `Discovered ${symbol}` : reasoning || "Scanning for new launches...",
-        className: "text-stone",
-        flashClass: "",
-        isThinking: false,
-      };
-    case "EVALUATE": {
-      const score = action.confidence != null ? `Score: ${Math.round(action.confidence)}/100` : "Evaluating";
-      const detail = reasoning ? ` — ${reasoning}` : "";
-      return {
-        text: `${score}${symbol ? ` [${symbol}]` : ""}${detail}`,
-        className: "text-ember",
-        flashClass: "",
-        isThinking: false,
-      };
-    }
     case "BUY": {
-      const monAmount = action.details?.monAmount as string | undefined;
-      const amt = monAmount ? ` — ${monAmount} MON` : "";
-      const detail = reasoning ? ` ${reasoning}` : "";
-      return {
-        text: `BUY ${symbol || "???"}${amt}${detail}`,
-        className: "text-torch-gold font-semibold glow-text",
-        flashClass: "row-flash-buy",
-        isThinking: false,
-      };
+      const mon = action.details?.monAmount as string | undefined;
+      return `${symbol || "???"} — ${mon ? mon + " MON" : ""}${reasoning ? " · " + reasoning : ""}`;
     }
     case "SELL": {
-      const sellMon = action.details?.monAmount as string | undefined;
-      const sellAmt = sellMon ? ` — ${sellMon} MON` : "";
-      const detail = reasoning ? ` ${reasoning}` : "";
-      return {
-        text: `SELL ${symbol || "???"}${sellAmt}${detail}`,
-        className: "text-prometheus-red font-semibold",
-        flashClass: "row-flash-sell",
-        isThinking: false,
-      };
+      const mon = action.details?.monAmount as string | undefined;
+      const monStr = mon ? parseFloat(mon).toFixed(2) + " MON" : "";
+      return `${symbol || "???"} — ${monStr}${reasoning ? " · " + reasoning : ""}`;
     }
-    case "SKIP":
-      return {
-        text: `Passed on ${symbol || "token"}${reasoning ? ` — ${reasoning}` : ""}`,
-        className: "text-stone/60",
-        flashClass: "",
-        isThinking: false,
-      };
+    case "THINK":
+      return reasoning || "Processing...";
+    case "EVALUATE":
+      return `${symbol ? symbol + " " : ""}${action.confidence != null ? `[${Math.round(action.confidence)}/100]` : ""} ${reasoning || ""}`.trim();
     case "ERROR":
-      return {
-        text: reasoning || "Error encountered",
-        className: "text-prometheus-red",
-        flashClass: "",
-        isThinking: false,
-      };
+      return reasoning || "Error encountered";
     default:
-      return { text: reasoning || action.action, className: "text-stone", flashClass: "", isThinking: false };
+      return reasoning || action.action;
   }
 }
 
@@ -117,118 +71,109 @@ export function AgentTerminal() {
   useEffect(() => {
     if (seedData?.data && !hasSeeded.current) {
       hasSeeded.current = true;
-      setLines(seedData.data.slice(0, MAX_LINES).reverse());
+      setLines(seedData.data.slice(0, MAX_LINES));
     }
   }, [seedData]);
-
-  const showDemo = lines.length === 0 && !seedData?.data?.length;
 
   const onSSEMessage = useCallback((data: unknown) => {
     const event = data as Record<string, unknown>;
     if (event.type === "PULSE" || event.type === "connected") return;
     const action = event as unknown as BotAction;
     if (action.id && action.action) {
-      setLines((prev) => [...prev, action].slice(-MAX_LINES));
+      setLines((prev) => [action, ...prev].slice(0, MAX_LINES));
     }
   }, []);
   useSSE(onSSEMessage);
 
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [lines]);
-
-  const displayLines = showDemo ? DEMO_LINES : lines;
-
   const actionsPerHour = useMemo(() => {
-    if (lines.length < 2) return 0;
-    const now = Date.now();
-    const oneHourAgo = now - 3600000;
-    const recentCount = lines.filter((l) => {
-      const t = new Date(l.timestamp).getTime();
-      return t >= oneHourAgo;
-    }).length;
-    return recentCount;
+    const oneHourAgo = Date.now() - 3600000;
+    return lines.filter((l) => new Date(l.timestamp).getTime() >= oneHourAgo).length;
   }, [lines]);
 
   return (
-    <div className="relative bg-obsidian border border-ash/50 rounded-xl overflow-hidden terminal-glow scanlines flex flex-col h-full min-h-[420px]">
-      {/* Prometheus watermark */}
+    <div className="relative bg-obsidian border border-ash/50 rounded-xl overflow-hidden terminal-glow flex flex-col h-[340px]">
+      {/* Watermark */}
       <img
         src="/prometheus.png"
         alt=""
         aria-hidden="true"
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-auto opacity-[0.04] select-none pointer-events-none"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60%] h-auto opacity-[0.03] select-none pointer-events-none"
         style={{ filter: "invert(1) sepia(1) saturate(0.3) hue-rotate(10deg)" }}
         draggable={false}
       />
-      {/* Terminal header */}
-      <div className="relative z-10 flex items-center justify-between px-4 py-2.5 border-b border-ash/50 bg-charcoal/80 backdrop-blur-sm">
+
+      {/* Header */}
+      <div className="relative z-10 flex items-center justify-between px-4 py-2 border-b border-ash/50 bg-charcoal/80 backdrop-blur-sm shrink-0">
         <div className="flex items-center gap-2">
           <div className="flex gap-1">
-            <div className="w-2 h-2 rounded-full bg-prometheus-red/60" />
-            <div className="w-2 h-2 rounded-full bg-ember/60" />
-            <div className="w-2 h-2 rounded-full bg-torch-gold/60" />
+            <div className="w-1.5 h-1.5 rounded-full bg-prometheus-red/60" />
+            <div className="w-1.5 h-1.5 rounded-full bg-ember/60" />
+            <div className="w-1.5 h-1.5 rounded-full bg-torch-gold/60" />
           </div>
           <span className="text-[10px] text-stone uppercase tracking-widest font-[var(--font-mono)]">
-            Prometheus Neural Log
+            Neural Log
           </span>
         </div>
         <div className="flex items-center gap-3">
           {actionsPerHour > 0 && (
-            <span className="text-[9px] text-stone font-[var(--font-mono)]">
-              {actionsPerHour} actions/hr
+            <span className="text-[9px] text-stone/60 font-[var(--font-mono)]">
+              {actionsPerHour}/hr
             </span>
           )}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <div className="w-1.5 h-1.5 rounded-full bg-torch-gold heartbeat" />
             <span className="text-[9px] text-torch-gold font-[var(--font-mono)] font-semibold">LIVE</span>
           </div>
         </div>
       </div>
 
-      {/* Terminal body */}
-      <div ref={scrollRef} className="relative z-10 flex-1 overflow-y-auto p-3 space-y-0.5 font-[var(--font-mono)] text-xs">
-        {displayLines.map((action) => {
-          const { text, className, flashClass, isThinking } = formatTerminalLine(action);
-          const time = new Date(action.timestamp).toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-            hour12: false,
-          });
-
-          return (
-            <div
-              key={action.id}
-              className={`terminal-line-enter flex items-start gap-2 leading-relaxed py-0.5 px-1 rounded ${flashClass}`}
-            >
-              <span className="text-ash/60 shrink-0 text-[10px]">{time}</span>
-              <span className="text-ash/30 shrink-0">{">"}</span>
-              <SentimentDot sentiment={action.sentiment} />
-              <span className={className}>
-                {text}
-                {isThinking && <span className="thinking-dots" />}
-              </span>
-              {action.action === "EVALUATE" && action.confidence != null && (
-                <ConfidenceBar confidence={action.confidence} />
-              )}
-              {action.action === "BUY" && action.confidence != null && (
-                <ConfidenceBar confidence={action.confidence} />
-              )}
+      {/* Body — newest first, fixed height, scrollable */}
+      <div ref={scrollRef} className="relative z-10 flex-1 min-h-0 overflow-y-auto px-2 py-1.5 font-[var(--font-mono)] text-[11px]">
+        {lines.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <span className="terminal-blink text-torch-gold text-sm">_</span>
+              <p className="text-[10px] text-stone/30 mt-1">Awaiting neural link...</p>
             </div>
-          );
-        })}
+          </div>
+        ) : (
+          <div className="space-y-[2px]">
+            {lines.map((action) => {
+              const tag = actionTag(action.action);
+              const msg = formatMessage(action);
+              const isTrade = action.action === "BUY" || action.action === "SELL";
 
-        {/* Blinking cursor */}
-        <div className="flex items-center gap-2 mt-1 px-1">
-          <span className="text-ash/60 text-[10px]">
-            {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
-          </span>
-          <span className="text-ash/30">{">"}</span>
-          <span className="terminal-blink text-torch-gold">_</span>
-          {showDemo && <span className="text-stone/40 text-[10px] italic">Awaiting neural link...</span>}
-        </div>
+              return (
+                <div
+                  key={action.id}
+                  className={`flex items-center gap-1.5 py-[3px] px-1.5 rounded group transition-colors ${
+                    isTrade ? "bg-ash/10" : "hover:bg-ash/5"
+                  }`}
+                >
+                  {/* Time */}
+                  <span className="text-[9px] text-stone/50 shrink-0 w-[52px] tabular-nums">
+                    {formatTime(action.timestamp)}
+                  </span>
+
+                  {/* Action tag */}
+                  <span className={`text-[8px] font-bold uppercase px-1.5 py-[1px] rounded border shrink-0 ${tag.bg} ${tag.color}`}>
+                    {tag.label}
+                  </span>
+
+                  {/* Message */}
+                  <span className={`truncate flex-1 min-w-0 ${isTrade ? tag.color + " font-semibold" : "text-ivory/70"}`}>
+                    {msg}
+                  </span>
+
+                  {/* Confidence pip */}
+                  {action.confidence != null && action.action !== "EVALUATE" && (
+                    <span className="text-[8px] text-stone/40 shrink-0">{Math.round(action.confidence)}%</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

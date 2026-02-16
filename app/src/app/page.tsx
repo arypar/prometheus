@@ -126,16 +126,6 @@ function LiveFeed() {
   const { data } = useActivity(1);
   const [liveActions, setLiveActions] = useState<BotAction[]>([]);
 
-  const actionVariant: Record<string, "buy" | "sell" | "warning" | "error" | "default"> = {
-    BUY: "buy",
-    SELL: "sell",
-    EVALUATE: "warning",
-    ERROR: "error",
-    SCAN: "default",
-    SKIP: "default",
-    THINK: "default",
-  };
-
   const onSSEMessage = useCallback((data: unknown) => {
     const event = data as Record<string, unknown>;
     if (event.type === "PULSE" || event.type === "connected") return;
@@ -144,48 +134,104 @@ function LiveFeed() {
   }, []);
   useSSE(onSSEMessage);
 
-  const allActions = [...liveActions, ...(data?.data || [])].slice(0, 15);
+  const allActions = [...liveActions, ...(data?.data || [])].slice(0, 20);
+
+  const actionStyle: Record<string, { color: string; bg: string }> = {
+    BUY:      { color: "text-emerald-400", bg: "bg-emerald-400/10 border-emerald-400/30" },
+    SELL:     { color: "text-rose-400",    bg: "bg-rose-400/10 border-rose-400/30" },
+    THINK:    { color: "text-violet-400",  bg: "bg-violet-400/10 border-violet-400/30" },
+    EVALUATE: { color: "text-amber-400",   bg: "bg-amber-400/10 border-amber-400/30" },
+    ERROR:    { color: "text-red-500",     bg: "bg-red-500/10 border-red-500/30" },
+    SCAN:     { color: "text-cyan-400",    bg: "bg-cyan-400/10 border-cyan-400/30" },
+    SKIP:     { color: "text-stone",       bg: "bg-stone/10 border-stone/30" },
+  };
+
+  function formatDecisionTime(ts: string): string {
+    return new Date(ts).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  }
 
   return (
-    <Card variant="glow" className="flex flex-col h-full min-h-[420px] p-0 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-ash/50 bg-charcoal/80">
+    <Card variant="glow" className="flex flex-col h-[340px] p-0 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-ash/50 bg-charcoal/80 shrink-0">
         <span className="text-[10px] text-stone uppercase tracking-widest font-[var(--font-mono)]">
-          Live Decisions
+          Decisions
         </span>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           <div className="w-1.5 h-1.5 rounded-full bg-torch-gold heartbeat" />
           <span className="text-[9px] text-torch-gold font-[var(--font-mono)] font-semibold">LIVE</span>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto divide-y divide-ash/20">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         {!allActions.length ? (
-          <div className="flex items-center justify-center h-full text-stone text-xs">
+          <div className="flex items-center justify-center h-full text-stone/40 text-xs font-[var(--font-mono)]">
             Waiting for decisions...
           </div>
         ) : (
-          allActions.map((action) => (
-            <div key={action.id} className="flex items-center gap-2.5 px-3 py-2 hover:bg-ash/10 transition-colors">
-              <Badge variant={actionVariant[action.action] || "default"}>
-                {action.action}
-              </Badge>
-              <div className="flex-1 min-w-0">
-                <p className="text-[11px] text-ivory truncate">
-                  {action.token?.symbol || (action.tokenAddress ? shortenAddress(action.tokenAddress) : "System")}
-                </p>
-                {action.reasoning && (
-                  <p className="text-[9px] text-stone truncate">{action.reasoning}</p>
-                )}
-              </div>
-              <span className="text-[9px] text-stone whitespace-nowrap shrink-0">
-                {timeAgo(action.timestamp)}
-              </span>
-            </div>
-          ))
+          <div className="px-2 py-1 space-y-[2px]">
+            {allActions.map((action) => {
+              const style = actionStyle[action.action] || actionStyle.SKIP;
+              const isTrade = action.action === "BUY" || action.action === "SELL";
+              const symbol = action.token?.symbol || (action.tokenAddress ? shortenAddress(action.tokenAddress) : "");
+              const mon = action.details?.monAmount as string | undefined;
+
+              return (
+                <div
+                  key={action.id}
+                  className={`flex items-center gap-1.5 px-2 py-[5px] rounded transition-colors font-[var(--font-mono)] ${
+                    isTrade ? "bg-ash/10" : "hover:bg-ash/5"
+                  }`}
+                >
+                  {/* Time */}
+                  <span className="text-[9px] text-stone/40 shrink-0 w-[34px] tabular-nums">
+                    {formatDecisionTime(action.timestamp)}
+                  </span>
+
+                  {/* Action badge */}
+                  <span className={`text-[8px] font-bold uppercase px-1.5 py-[1px] rounded border shrink-0 ${style.bg} ${style.color}`}>
+                    {action.action === "EVALUATE" ? "EVAL" : action.action === "THINK" ? "THINK" : action.action}
+                  </span>
+
+                  {/* Symbol */}
+                  {symbol && (
+                    <span className={`text-[11px] font-semibold shrink-0 ${isTrade ? style.color : "text-ivory/80"}`}>
+                      {symbol}
+                    </span>
+                  )}
+
+                  {/* Amount for trades */}
+                  {isTrade && mon && (
+                    <span className="text-[9px] text-stone/60 shrink-0">
+                      {parseFloat(mon).toFixed(2)} MON
+                    </span>
+                  )}
+
+                  {/* Reasoning (truncated) */}
+                  {action.reasoning && !isTrade && (
+                    <span className="text-[9px] text-stone/50 truncate flex-1 min-w-0">
+                      {action.reasoning.length > 60 ? action.reasoning.slice(0, 60) + "…" : action.reasoning}
+                    </span>
+                  )}
+
+                  {/* Spacer */}
+                  {isTrade && <span className="flex-1" />}
+
+                  {/* Confidence */}
+                  {action.confidence != null && (
+                    <span className="text-[8px] text-stone/30 shrink-0">{Math.round(action.confidence)}%</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
-      <div className="border-t border-ash/30 px-3 py-1.5 bg-charcoal/40 text-center">
-        <Link href="/decisions" className="text-[10px] text-stone hover:text-torch-gold transition-colors">
-          View all decisions &rarr;
+      <div className="border-t border-ash/30 px-3 py-1.5 bg-charcoal/40 text-center shrink-0">
+        <Link href="/decisions" className="text-[10px] text-stone hover:text-torch-gold transition-colors font-[var(--font-mono)]">
+          View all &rarr;
         </Link>
       </div>
     </Card>
@@ -325,31 +371,36 @@ export default function HomePage() {
         {/* Hero Banner */}
         <HeroBanner />
 
+        {/* Portfolio Chart — hero position, Robinhood style */}
+        <div className="mt-5 card-rise stagger-1">
+          <PortfolioChart />
+        </div>
+
         {/* Stats Row */}
         {overview && (
-          <div className="mt-5 card-rise stagger-1">
+          <div className="mt-4 card-rise stagger-2">
             <StatsGrid data={overview} />
           </div>
         )}
 
         {/* Terminal + Live Feed side-by-side */}
-        <div className="mt-5 grid grid-cols-1 lg:grid-cols-5 gap-4">
-          <div className="lg:col-span-3 card-rise stagger-2">
+        <div className="mt-4 grid grid-cols-1 lg:grid-cols-5 gap-4">
+          <div className="lg:col-span-3 card-rise stagger-3">
             <AgentTerminal />
           </div>
-          <div className="lg:col-span-2 card-rise stagger-3">
+          <div className="lg:col-span-2 card-rise stagger-4">
             <LiveFeed />
           </div>
         </div>
 
         {/* Neural Cortex — live system activity */}
-        <div className="mt-4 card-rise stagger-4">
+        <div className="mt-4 card-rise stagger-5">
           <NeuralCortex />
         </div>
 
         {/* Sentiment + Pipeline + Holdings */}
         <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="card-rise stagger-5">
+          <div className="card-rise stagger-6">
             <AgentSentiment />
           </div>
           <div className="card-rise stagger-6">
@@ -358,11 +409,6 @@ export default function HomePage() {
           <div className="card-rise stagger-6">
             <HoldingsGrid />
           </div>
-        </div>
-
-        {/* Performance Chart */}
-        <div className="mt-4 card-rise">
-          <PortfolioChart />
         </div>
 
         {/* Footer */}
