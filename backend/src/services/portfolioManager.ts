@@ -11,15 +11,15 @@ import { logBotAction, recordTransaction } from "./botService";
 import { pulse } from "../utils/pulse";
 
 // --- Timing ---
-const MONITOR_INTERVAL_MS = 30_000;        // lightweight scan every 30s
-const MIN_DECISION_GAP_MS = 10 * 60_000;   // at least 10 min between AI decisions
-const MAX_DECISION_GAP_MS = 15 * 60_000;   // force a decision check after 15 min of silence
-const COOLDOWN_MS = 30 * 60_000;           // don't re-trade same token within 30 min
+const MONITOR_INTERVAL_MS = 20_000;        // lightweight scan every 20s
+const MIN_DECISION_GAP_MS = 3 * 60_000;   // at least 3 min between AI decisions
+const MAX_DECISION_GAP_MS = 5 * 60_000;   // force a decision check after 5 min of silence
+const COOLDOWN_MS = 10 * 60_000;           // don't re-trade same token within 10 min
 
 // --- Trigger thresholds ---
-const STOP_LOSS_THRESHOLD = -25;            // ROI% to trigger urgent sell check
-const TAKE_PROFIT_THRESHOLD = 80;           // ROI% to trigger profit-taking check
-const HIGH_SCORE_THRESHOLD = 70;            // token score to trigger buy check
+const STOP_LOSS_THRESHOLD = -15;            // ROI% to trigger urgent sell check
+const TAKE_PROFIT_THRESHOLD = 40;           // ROI% to trigger profit-taking check
+const HIGH_SCORE_THRESHOLD = 45;            // token score to trigger buy check
 
 const recentlyTraded = new Map<string, number>();
 let lastDecisionTime = 0;
@@ -286,7 +286,7 @@ async function gatherContext(): Promise<PortfolioContext> {
   const { data: candidateTokens } = await supabase
     .from("Token")
     .select("address, symbol, name, score, currentPrice, marketCap, volume24h, holderCount, discoveredAt, marketType")
-    .gte("score", 55)
+    .gte("score", 35)
     .eq("marketType", "CURVE")
     .order("score", { ascending: false })
     .limit(15);

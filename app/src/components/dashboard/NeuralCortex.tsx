@@ -34,32 +34,26 @@ export function NeuralCortex() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const hasSeedRef = useRef(false);
 
-  // Seed with recent pulse history
+  // Seed with recent pulse history (newest first)
   useEffect(() => {
     if (hasSeedRef.current) return;
     hasSeedRef.current = true;
     api.getPulse().then((data) => {
       if (data?.length) {
-        setLines(data.slice(-MAX_LINES));
+        setLines(data.slice(-MAX_LINES).reverse());
         setTotalCount(data.length);
       }
     }).catch(() => {});
   }, []);
 
-  // Subscribe to live pulse events via shared SSE
+  // Subscribe to live pulse events via shared SSE (prepend newest)
   const onSSEMessage = useCallback((data: unknown) => {
     const msg = data as { type?: string } & PulseMessage;
     if (msg.type !== "PULSE" || !msg.id) return;
-    setLines((prev) => [...prev, msg].slice(-MAX_LINES));
+    setLines((prev) => [msg, ...prev].slice(0, MAX_LINES));
     setTotalCount((c) => c + 1);
   }, []);
   const { connected } = useSSE(onSSEMessage);
-
-  // Auto-scroll to bottom
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [lines]);
 
   // Update relative timestamps every 10s
   const [, setTick] = useState(0);
@@ -99,8 +93,8 @@ export function NeuralCortex() {
         </div>
       </div>
 
-      {/* Pulse feed */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-1.5 space-y-0.5 font-[var(--font-mono)] text-[11px]">
+      {/* Pulse feed — fixed height, scrollable, newest at top */}
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-1.5 space-y-0.5 font-[var(--font-mono)] text-[11px]">
         {lines.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
@@ -109,39 +103,39 @@ export function NeuralCortex() {
             </div>
           </div>
         ) : (
-          lines.map((pulse) => {
-            const cfg = CATEGORY_CONFIG[pulse.category] || DEFAULT_CONFIG;
-            const Icon = cfg.icon;
-            return (
-              <div
-                key={pulse.id}
-                className="cortex-line flex items-start gap-2 py-[3px] px-1.5 rounded hover:bg-ash/10 transition-colors group"
-              >
-                {/* Category dot */}
-                <span className={`mt-[3px] w-1.5 h-1.5 rounded-full ${cfg.glow} opacity-70 shrink-0 group-hover:opacity-100 transition-opacity`} />
+          <>
+            {/* Blinking cursor at top */}
+            <div className="flex items-center gap-2 mb-0.5 px-1.5 opacity-50">
+              <span className="w-1.5 h-1.5 rounded-full bg-torch-gold/30" />
+              <span className="terminal-blink text-torch-gold text-[10px]">_</span>
+            </div>
 
-                {/* Category icon + label */}
-                <span className={`flex items-center gap-1 shrink-0 ${cfg.color} opacity-60`}>
-                  <Icon className="w-3 h-3" />
-                  <span className="text-[8px] uppercase tracking-wider w-[52px]">{cfg.label}</span>
-                </span>
+            {lines.map((pulse) => {
+              const cfg = CATEGORY_CONFIG[pulse.category] || DEFAULT_CONFIG;
+              const Icon = cfg.icon;
+              return (
+                <div
+                  key={pulse.id}
+                  className="cortex-line flex items-start gap-2 py-[3px] px-1.5 rounded hover:bg-ash/10 transition-colors group"
+                >
+                  {/* Category dot */}
+                  <span className={`mt-[3px] w-1.5 h-1.5 rounded-full ${cfg.glow} opacity-70 shrink-0 group-hover:opacity-100 transition-opacity`} />
 
-                {/* Message */}
-                <span className="text-ivory/80 truncate flex-1 min-w-0">{pulse.message}</span>
+                  {/* Category icon + label */}
+                  <span className={`flex items-center gap-1 shrink-0 ${cfg.color} opacity-60`}>
+                    <Icon className="w-3 h-3" />
+                    <span className="text-[8px] uppercase tracking-wider w-[52px]">{cfg.label}</span>
+                  </span>
 
-                {/* Timestamp */}
-                <span className="text-stone/40 text-[9px] shrink-0 ml-1">{timeAgoShort(pulse.timestamp)}</span>
-              </div>
-            );
-          })
-        )}
+                  {/* Message */}
+                  <span className="text-ivory/80 truncate flex-1 min-w-0">{pulse.message}</span>
 
-        {/* Blinking cursor */}
-        {lines.length > 0 && (
-          <div className="flex items-center gap-2 mt-0.5 px-1.5 opacity-50">
-            <span className="w-1.5 h-1.5 rounded-full bg-torch-gold/30" />
-            <span className="terminal-blink text-torch-gold text-[10px]">_</span>
-          </div>
+                  {/* Timestamp */}
+                  <span className="text-stone/40 text-[9px] shrink-0 ml-1">{timeAgoShort(pulse.timestamp)}</span>
+                </div>
+              );
+            })}
+          </>
         )}
       </div>
 
