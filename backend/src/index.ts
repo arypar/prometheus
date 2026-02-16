@@ -15,7 +15,13 @@ import pulseRoutes from "./routes/pulse";
 const app = express();
 
 // Middleware
-app.use(cors());
+const corsOrigin = env.CORS_ORIGIN;
+app.use(
+  cors({
+    origin: corsOrigin === "*" ? true : corsOrigin.split(",").map((o) => o.trim()),
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 // Health check

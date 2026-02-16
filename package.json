@@ -16,9 +16,6 @@
     "build": "npm run build:backend && npm run build:app"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
-  },
-  "devDependencies": {
     "concurrently": "^9.2.1"
   }
 }
