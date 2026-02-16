@@ -6,6 +6,7 @@ import type {
   PortfolioOverview,
   PortfolioSnapshot,
   HoldingWithToken,
+  LiveValue,
   Transaction,
   Token,
   TokenDetail,
@@ -55,6 +56,14 @@ export function usePortfolioOverview() {
 
 export function usePortfolioHistory(period = "7d") {
   return useSWR<PortfolioSnapshot[]>(`portfolio-history-${period}`, () => api.getPortfolioHistory(period), NORMAL);
+}
+
+export function usePortfolioLive() {
+  return useSWR<LiveValue>("portfolio-live", () => api.getPortfolioLive(), {
+    refreshInterval: 5_000,
+    revalidateOnFocus: false,
+    dedupingInterval: 3_000,
+  });
 }
 
 export function useHoldings() {

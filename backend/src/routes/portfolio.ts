@@ -1,7 +1,17 @@
 import { Router, Request, Response } from "express";
-import { getPortfolioOverview, getPortfolioHistory, getHoldings } from "../services/portfolioService";
+import { getPortfolioOverview, getPortfolioHistory, getHoldings, getPortfolioLiveValue } from "../services/portfolioService";
 
 const router = Router();
+
+router.get("/live", async (_req: Request, res: Response) => {
+  try {
+    const value = await getPortfolioLiveValue();
+    res.json(value);
+  } catch (err) {
+    console.error("Portfolio live value error:", err);
+    res.status(500).json({ error: "Failed to fetch live value" });
+  }
+});
 
 router.get("/overview", async (_req: Request, res: Response) => {
   try {

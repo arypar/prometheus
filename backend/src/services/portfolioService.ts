@@ -26,6 +26,40 @@ function setCache<T>(key: string, data: T, ttlMs: number): void {
 }
 
 const OVERVIEW_TTL = 30_000; // 30 seconds
+const LIVE_TTL = 3_000; // 3 seconds — aggressive cache for high-frequency polling
+
+export interface LiveValue {
+  value: string;
+  timestamp: string;
+}
+
+export async function getPortfolioLiveValue(): Promise<LiveValue> {
+  const cached = getCached<LiveValue>("portfolio-live");
+  if (cached) return cached;
+
+  const [holdingsResult, walletBalance] = await Promise.all([
+    supabase.from("Holding").select("amount, token:Token(currentPrice)"),
+    env.MOLTBOT_WALLET_ADDRESS
+      ? getWalletBalance(env.MOLTBOT_WALLET_ADDRESS)
+      : Promise.resolve("0"),
+  ]);
+
+  let totalValueMon = parseFloat(walletBalance);
+  for (const h of holdingsResult.data || []) {
+    const price = (h as Record<string, unknown>).token
+      ? parseFloat(((h as Record<string, unknown>).token as { currentPrice?: string })?.currentPrice || "0")
+      : 0;
+    totalValueMon += parseFloat(h.amount) * price;
+  }
+
+  const result: LiveValue = {
+    value: totalValueMon.toFixed(6),
+    timestamp: new Date().toISOString(),
+  };
+
+  setCache("portfolio-live", result, LIVE_TTL);
+  return result;
+}
 
 export async function getPortfolioOverview(): Promise<PortfolioOverview> {
   const cached = getCached<PortfolioOverview>("portfolio-overview");

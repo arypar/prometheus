@@ -166,6 +166,11 @@ export interface WalletInfo {
   txCount: number;
 }
 
+export interface LiveValue {
+  value: string;
+  timestamp: string;
+}
+
 export interface PulseMessage {
   id: string;
   category: string;

@@ -3,6 +3,7 @@ import type {
   PortfolioOverview,
   PortfolioSnapshot,
   HoldingWithToken,
+  LiveValue,
   Transaction,
   Token,
   TokenDetail,
@@ -27,6 +28,7 @@ export const api = {
   getPortfolioOverview: () => fetchAPI<PortfolioOverview>("/portfolio/overview"),
   getPortfolioHistory: (period = "7d") =>
     fetchAPI<PortfolioSnapshot[]>(`/portfolio/history?period=${period}`),
+  getPortfolioLive: () => fetchAPI<LiveValue>("/portfolio/live"),
   getHoldings: () => fetchAPI<HoldingWithToken[]>("/portfolio/holdings"),
 
   // Transactions
