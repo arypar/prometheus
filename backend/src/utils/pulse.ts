@@ -1,6 +1,8 @@
 import { env } from "../config/env";
 
-const API_URL = `http://localhost:${env.PORT}/api/pulse`;
+const API_URL = env.API_URL
+  ? `${env.API_URL}/api/pulse`
+  : `http://localhost:${env.PORT}/api/pulse`;
 
 /**
  * Send a pulse event to the API for live frontend streaming.

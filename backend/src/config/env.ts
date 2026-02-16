@@ -15,4 +15,5 @@ export const env = {
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || "",
   PROMETHEUS_PRIVATE_KEY: process.env.PROMETHEUS_PRIVATE_KEY || "",
   CORS_ORIGIN: process.env.CORS_ORIGIN || "*",
+  API_URL: process.env.API_URL || "",
 };
