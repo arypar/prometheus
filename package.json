@@ -7,13 +7,18 @@
     "backend"
   ],
   "scripts": {
+    "dev": "concurrently -n app,api,worker -c cyan,green,yellow \"npm run dev:app\" \"npm run dev:api\" \"npm run dev:worker\"",
     "dev:app": "npm run dev --workspace=app",
-    "dev:backend": "npm run dev --workspace=backend",
+    "dev:api": "npm run dev:api --workspace=backend",
+    "dev:worker": "npm run dev:worker --workspace=backend",
     "build:app": "npm run build --workspace=app",
     "build:backend": "npm run build --workspace=backend",
-    "build": "npm run build:backend && npm run build:app",
-    "db:migrate": "npm run db:migrate --workspace=backend",
-    "db:generate": "npm run db:generate --workspace=backend",
-    "db:seed": "npm run db:seed --workspace=backend"
+    "build": "npm run build:backend && npm run build:app"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

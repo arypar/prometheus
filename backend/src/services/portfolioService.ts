@@ -1,11 +1,57 @@
-import { prisma } from "../config/database";
+import { supabase } from "../config/database";
+import { env } from "../config/env";
+import { getWalletBalance } from "./chainService";
 import { PortfolioOverview, HoldingWithToken } from "../types";
 
-export async function getPortfolioOverview(): Promise<PortfolioOverview> {
-  const holdings = await prisma.holding.findMany({
-    include: { token: true },
-  });
+/* ── Simple TTL cache ────────────────────────────────── */
+interface CacheEntry<T> {
+  data: T;
+  expiresAt: number;
+}
 
+const cache = new Map<string, CacheEntry<unknown>>();
+
+function getCached<T>(key: string): T | null {
+  const entry = cache.get(key) as CacheEntry<T> | undefined;
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCache<T>(key: string, data: T, ttlMs: number): void {
+  cache.set(key, { data, expiresAt: Date.now() + ttlMs });
+}
+
+const OVERVIEW_TTL = 30_000; // 30 seconds
+
+export async function getPortfolioOverview(): Promise<PortfolioOverview> {
+  const cached = getCached<PortfolioOverview>("portfolio-overview");
+  if (cached) return cached;
+
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  // Run all queries in parallel instead of sequentially
+  const [holdingsResult, transactionsResult, snapshotsResult, walletBalance] =
+    await Promise.all([
+      supabase.from("Holding").select("*, token:Token(*)"),
+      supabase.from("Transaction").select("*"),
+      supabase
+        .from("PortfolioSnapshot")
+        .select("totalValueMon")
+        .lte("timestamp", yesterday)
+        .order("timestamp", { ascending: false })
+        .limit(1),
+      env.MOLTBOT_WALLET_ADDRESS
+        ? getWalletBalance(env.MOLTBOT_WALLET_ADDRESS)
+        : Promise.resolve("0"),
+    ]);
+
+  if (holdingsResult.error) throw holdingsResult.error;
+
+  const holdings = holdingsResult.data || [];
   let totalValueMon = 0;
   let totalInvested = 0;
   let unrealizedPnl = 0;
@@ -19,11 +65,10 @@ export async function getPortfolioOverview(): Promise<PortfolioOverview> {
     realizedPnl += parseFloat(h.realizedPnl);
   }
 
-  const transactions = await prisma.transaction.findMany();
-  const totalGasSpent = transactions.reduce((sum, tx) => sum + parseFloat(tx.gasCost), 0);
+  const txs = transactionsResult.data || [];
+  const totalGasSpent = txs.reduce((sum, tx) => sum + parseFloat(tx.gasCost), 0);
 
-  // Win rate: tokens sold at profit / total tokens sold
-  const sellTxs = transactions.filter((tx) => tx.type === "SELL");
+  const sellTxs = txs.filter((tx) => tx.type === "SELL");
   const tokenSellMap = new Map<string, number>();
   for (const tx of sellTxs) {
     const current = tokenSellMap.get(tx.tokenAddress) || 0;
@@ -31,7 +76,7 @@ export async function getPortfolioOverview(): Promise<PortfolioOverview> {
   }
 
   const buyTxMap = new Map<string, number>();
-  for (const tx of transactions.filter((t) => t.type === "BUY")) {
+  for (const tx of txs.filter((t) => t.type === "BUY")) {
     const current = buyTxMap.get(tx.tokenAddress) || 0;
     buyTxMap.set(tx.tokenAddress, current + parseFloat(tx.monAmount));
   }
@@ -46,16 +91,12 @@ export async function getPortfolioOverview(): Promise<PortfolioOverview> {
 
   const winRate = wins + losses > 0 ? (wins / (wins + losses)) * 100 : 0;
 
-  // 24h change
-  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const lastSnapshot = await prisma.portfolioSnapshot.findFirst({
-    where: { timestamp: { lte: yesterday } },
-    orderBy: { timestamp: "desc" },
-  });
-  const previousValue = lastSnapshot ? parseFloat(lastSnapshot.totalValueMon) : totalInvested;
+  const previousValue = snapshotsResult.data?.[0]
+    ? parseFloat(snapshotsResult.data[0].totalValueMon)
+    : totalInvested;
   const change24h = previousValue > 0 ? ((totalValueMon - previousValue) / previousValue) * 100 : 0;
 
-  return {
+  const result: PortfolioOverview = {
     totalValueMon: totalValueMon.toFixed(6),
     totalInvested: totalInvested.toFixed(6),
     unrealizedPnl: unrealizedPnl.toFixed(6),
@@ -64,9 +105,12 @@ export async function getPortfolioOverview(): Promise<PortfolioOverview> {
     winRate: Math.round(winRate * 100) / 100,
     totalGasSpent: totalGasSpent.toFixed(6),
     activePositions: holdings.length,
-    walletBalance: "0",
+    walletBalance,
     change24h: change24h.toFixed(2),
   };
+
+  setCache("portfolio-overview", result, OVERVIEW_TTL);
+  return result;
 }
 
 export async function getPortfolioHistory(period: string) {
@@ -87,18 +131,24 @@ export async function getPortfolioHistory(period: string) {
       since = new Date(0);
   }
 
-  return prisma.portfolioSnapshot.findMany({
-    where: { timestamp: { gte: since } },
-    orderBy: { timestamp: "asc" },
-  });
+  const { data, error } = await supabase
+    .from("PortfolioSnapshot")
+    .select("*")
+    .gte("timestamp", since.toISOString())
+    .order("timestamp", { ascending: true });
+
+  if (error) throw error;
+  return data;
 }
 
 export async function getHoldings(): Promise<HoldingWithToken[]> {
-  const holdings = await prisma.holding.findMany({
-    include: { token: true },
-  });
+  const { data: holdings, error } = await supabase
+    .from("Holding")
+    .select("*, token:Token(name, symbol, currentPrice, imageUrl)");
 
-  return holdings.map((h) => {
+  if (error) throw error;
+
+  return (holdings || []).map((h) => {
     const currentValue = parseFloat(h.amount) * parseFloat(h.token.currentPrice);
     const invested = parseFloat(h.totalInvested);
     const unrealizedPnl = currentValue - invested;

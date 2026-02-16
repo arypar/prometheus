@@ -1,16 +1,15 @@
-import { prisma } from "../config/database";
+import { supabase } from "../config/database";
 
 export async function getWinRate() {
-  const holdings = await prisma.holding.findMany({
-    include: { token: true },
-  });
+  const { data: transactions } = await supabase
+    .from("Transaction")
+    .select("*");
 
-  const transactions = await prisma.transaction.findMany();
+  const txs = transactions || [];
 
-  // Group sells by token
   const tokenPnl = new Map<string, { symbol: string; buyTotal: number; sellTotal: number }>();
 
-  for (const tx of transactions) {
+  for (const tx of txs) {
     if (!tokenPnl.has(tx.tokenAddress)) {
       tokenPnl.set(tx.tokenAddress, { symbol: tx.tokenAddress, buyTotal: 0, sellTotal: 0 });
     }
@@ -45,11 +44,11 @@ export async function getWinRate() {
 }
 
 export async function getRoiByToken() {
-  const holdings = await prisma.holding.findMany({
-    include: { token: true },
-  });
+  const { data: holdings } = await supabase
+    .from("Holding")
+    .select("*, token:Token(name, symbol, currentPrice)");
 
-  return holdings
+  return (holdings || [])
     .map((h) => {
       const currentValue = parseFloat(h.amount) * parseFloat(h.token.currentPrice);
       const invested = parseFloat(h.totalInvested);
@@ -70,14 +69,16 @@ export async function getRoiByToken() {
 }
 
 export async function getVolumeData() {
-  const transactions = await prisma.transaction.findMany({
-    orderBy: { timestamp: "asc" },
-  });
+  const { data: transactions } = await supabase
+    .from("Transaction")
+    .select("*")
+    .order("timestamp", { ascending: true });
 
+  const txs = transactions || [];
   const dailyVolume = new Map<string, { buys: number; sells: number; total: number }>();
 
-  for (const tx of transactions) {
-    const day = tx.timestamp.toISOString().split("T")[0];
+  for (const tx of txs) {
+    const day = new Date(tx.timestamp).toISOString().split("T")[0];
     if (!dailyVolume.has(day)) {
       dailyVolume.set(day, { buys: 0, sells: 0, total: 0 });
     }

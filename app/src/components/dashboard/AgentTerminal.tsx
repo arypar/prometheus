@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useActivity } from "@/hooks/useData";
-import { API_BASE } from "@/lib/constants";
+import { useSSE } from "@/hooks/useSSE";
 import type { BotAction } from "@/types";
 
 const DEMO_LINES: BotAction[] = [
@@ -38,20 +38,24 @@ function ConfidenceBar({ confidence }: { confidence: number }) {
   );
 }
 
-function formatTerminalLine(action: BotAction): { text: string; className: string } {
+function formatTerminalLine(action: BotAction): { text: string; className: string; flashClass: string; isThinking: boolean } {
   const symbol = action.token?.symbol;
   const reasoning = action.reasoning;
 
   switch (action.action) {
     case "THINK":
       return {
-        text: reasoning || "Processing...",
+        text: reasoning || "Processing",
         className: "text-stone italic",
+        flashClass: "",
+        isThinking: true,
       };
     case "SCAN":
       return {
         text: symbol ? `Discovered ${symbol}` : reasoning || "Scanning for new launches...",
         className: "text-stone",
+        flashClass: "",
+        isThinking: false,
       };
     case "EVALUATE": {
       const score = action.confidence != null ? `Score: ${Math.round(action.confidence)}/100` : "Evaluating";
@@ -59,6 +63,8 @@ function formatTerminalLine(action: BotAction): { text: string; className: strin
       return {
         text: `${score}${symbol ? ` [${symbol}]` : ""}${detail}`,
         className: "text-ember",
+        flashClass: "",
+        isThinking: false,
       };
     }
     case "BUY": {
@@ -67,7 +73,9 @@ function formatTerminalLine(action: BotAction): { text: string; className: strin
       const detail = reasoning ? ` ${reasoning}` : "";
       return {
         text: `BUY ${symbol || "???"}${amt}${detail}`,
-        className: "text-torch-gold font-medium",
+        className: "text-torch-gold font-semibold glow-text",
+        flashClass: "row-flash-buy",
+        isThinking: false,
       };
     }
     case "SELL": {
@@ -76,21 +84,27 @@ function formatTerminalLine(action: BotAction): { text: string; className: strin
       const detail = reasoning ? ` ${reasoning}` : "";
       return {
         text: `SELL ${symbol || "???"}${sellAmt}${detail}`,
-        className: "text-prometheus-red font-medium",
+        className: "text-prometheus-red font-semibold",
+        flashClass: "row-flash-sell",
+        isThinking: false,
       };
     }
     case "SKIP":
       return {
         text: `Passed on ${symbol || "token"}${reasoning ? ` — ${reasoning}` : ""}`,
         className: "text-stone/60",
+        flashClass: "",
+        isThinking: false,
       };
     case "ERROR":
       return {
         text: reasoning || "Error encountered",
         className: "text-prometheus-red",
+        flashClass: "",
+        isThinking: false,
       };
     default:
-      return { text: reasoning || action.action, className: "text-stone" };
+      return { text: reasoning || action.action, className: "text-stone", flashClass: "", isThinking: false };
   }
 }
 
@@ -100,7 +114,6 @@ export function AgentTerminal() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const hasSeeded = useRef(false);
 
-  // Seed from initial data
   useEffect(() => {
     if (seedData?.data && !hasSeeded.current) {
       hasSeeded.current = true;
@@ -108,24 +121,18 @@ export function AgentTerminal() {
     }
   }, [seedData]);
 
-  // Show demo lines if no data
   const showDemo = lines.length === 0 && !seedData?.data?.length;
 
-  // SSE connection
-  useEffect(() => {
-    const es = new EventSource(`${API_BASE}/activity/live`);
-    es.onmessage = (event) => {
-      try {
-        const action = JSON.parse(event.data) as BotAction;
-        if (action.id) {
-          setLines((prev) => [...prev, action].slice(-MAX_LINES));
-        }
-      } catch { /* ignore */ }
-    };
-    return () => es.close();
+  const onSSEMessage = useCallback((data: unknown) => {
+    const event = data as Record<string, unknown>;
+    if (event.type === "PULSE" || event.type === "connected") return;
+    const action = event as unknown as BotAction;
+    if (action.id && action.action) {
+      setLines((prev) => [...prev, action].slice(-MAX_LINES));
+    }
   }, []);
+  useSSE(onSSEMessage);
 
-  // Auto-scroll to bottom
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -133,8 +140,19 @@ export function AgentTerminal() {
 
   const displayLines = showDemo ? DEMO_LINES : lines;
 
+  const actionsPerHour = useMemo(() => {
+    if (lines.length < 2) return 0;
+    const now = Date.now();
+    const oneHourAgo = now - 3600000;
+    const recentCount = lines.filter((l) => {
+      const t = new Date(l.timestamp).getTime();
+      return t >= oneHourAgo;
+    }).length;
+    return recentCount;
+  }, [lines]);
+
   return (
-    <div className="relative bg-obsidian border border-ash/50 rounded-xl overflow-hidden terminal-glow flex flex-col h-[420px]">
+    <div className="relative bg-obsidian border border-ash/50 rounded-xl overflow-hidden terminal-glow scanlines flex flex-col h-full min-h-[420px]">
       {/* Prometheus watermark */}
       <img
         src="/prometheus.png"
@@ -145,7 +163,7 @@ export function AgentTerminal() {
         draggable={false}
       />
       {/* Terminal header */}
-      <div className="relative z-10 flex items-center justify-between px-4 py-2.5 border-b border-ash/50 bg-charcoal/50">
+      <div className="relative z-10 flex items-center justify-between px-4 py-2.5 border-b border-ash/50 bg-charcoal/80 backdrop-blur-sm">
         <div className="flex items-center gap-2">
           <div className="flex gap-1">
             <div className="w-2 h-2 rounded-full bg-prometheus-red/60" />
@@ -156,16 +174,23 @@ export function AgentTerminal() {
             Prometheus Neural Log
           </span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-1.5 h-1.5 rounded-full bg-torch-gold pulse-glow" />
-          <span className="text-[9px] text-torch-gold font-[var(--font-mono)]">LIVE</span>
+        <div className="flex items-center gap-3">
+          {actionsPerHour > 0 && (
+            <span className="text-[9px] text-stone font-[var(--font-mono)]">
+              {actionsPerHour} actions/hr
+            </span>
+          )}
+          <div className="flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-torch-gold heartbeat" />
+            <span className="text-[9px] text-torch-gold font-[var(--font-mono)] font-semibold">LIVE</span>
+          </div>
         </div>
       </div>
 
       {/* Terminal body */}
-      <div ref={scrollRef} className="relative z-10 flex-1 overflow-y-auto p-3 space-y-1 font-[var(--font-mono)] text-xs">
+      <div ref={scrollRef} className="relative z-10 flex-1 overflow-y-auto p-3 space-y-0.5 font-[var(--font-mono)] text-xs">
         {displayLines.map((action) => {
-          const { text, className } = formatTerminalLine(action);
+          const { text, className, flashClass, isThinking } = formatTerminalLine(action);
           const time = new Date(action.timestamp).toLocaleTimeString("en-US", {
             hour: "2-digit",
             minute: "2-digit",
@@ -174,10 +199,17 @@ export function AgentTerminal() {
           });
 
           return (
-            <div key={action.id} className="terminal-line-enter flex items-start gap-2 leading-relaxed">
-              <span className="text-ash shrink-0">{time}</span>
+            <div
+              key={action.id}
+              className={`terminal-line-enter flex items-start gap-2 leading-relaxed py-0.5 px-1 rounded ${flashClass}`}
+            >
+              <span className="text-ash/60 shrink-0 text-[10px]">{time}</span>
+              <span className="text-ash/30 shrink-0">{">"}</span>
               <SentimentDot sentiment={action.sentiment} />
-              <span className={className}>{text}</span>
+              <span className={className}>
+                {text}
+                {isThinking && <span className="thinking-dots" />}
+              </span>
               {action.action === "EVALUATE" && action.confidence != null && (
                 <ConfidenceBar confidence={action.confidence} />
               )}
@@ -189,10 +221,11 @@ export function AgentTerminal() {
         })}
 
         {/* Blinking cursor */}
-        <div className="flex items-center gap-2 mt-1">
-          <span className="text-ash">
+        <div className="flex items-center gap-2 mt-1 px-1">
+          <span className="text-ash/60 text-[10px]">
             {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
           </span>
+          <span className="text-ash/30">{">"}</span>
           <span className="terminal-blink text-torch-gold">_</span>
           {showDemo && <span className="text-stone/40 text-[10px] italic">Awaiting neural link...</span>}
         </div>

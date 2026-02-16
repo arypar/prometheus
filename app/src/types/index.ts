@@ -159,3 +159,17 @@ export interface VolumeData {
   sells: string;
   total: string;
 }
+
+export interface WalletInfo {
+  address: string;
+  balance: string;
+  txCount: number;
+}
+
+export interface PulseMessage {
+  id: string;
+  category: string;
+  message: string;
+  timestamp: string;
+  meta?: Record<string, unknown>;
+}

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useActivity } from "@/hooks/useData";
+import { useSSE } from "@/hooks/useSSE";
 import { ErrorState, EmptyState } from "@/components/ui/LoadingState";
 import { DecisionCard } from "@/components/decisions/DecisionCard";
 import { DecisionStats } from "@/components/decisions/DecisionStats";
 import { DecisionFilters } from "@/components/decisions/DecisionFilters";
-import { API_BASE } from "@/lib/constants";
 import type { BotAction } from "@/types";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -18,24 +18,16 @@ export default function DecisionsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const { data, isLoading, error } = useActivity(page, filter === "ALL" ? undefined : filter);
 
-  useEffect(() => {
+  const onSSEMessage = useCallback((data: unknown) => {
     if (!liveMode) return;
-
-    const eventSource = new EventSource(`${API_BASE}/activity/live`);
-
-    eventSource.onmessage = (event) => {
-      try {
-        const action = JSON.parse(event.data) as BotAction;
-        if (action.id) {
-          setLiveActions((prev) => [action, ...prev].slice(0, 100));
-        }
-      } catch {
-        // ignore
-      }
-    };
-
-    return () => eventSource.close();
+    const event = data as Record<string, unknown>;
+    if (event.type === "PULSE" || event.type === "connected") return;
+    const action = event as unknown as BotAction;
+    if (action.id && action.action) {
+      setLiveActions((prev) => [action, ...prev].slice(0, 100));
+    }
   }, [liveMode]);
+  useSSE(onSSEMessage);
 
   if (error) return <ErrorState />;
 

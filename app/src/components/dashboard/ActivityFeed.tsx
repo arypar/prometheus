@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useCallback } from "react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { useActivity } from "@/hooks/useData";
+import { useSSE } from "@/hooks/useSSE";
 import { LoadingState, EmptyState } from "@/components/ui/LoadingState";
 import { timeAgo, shortenAddress } from "@/lib/utils";
-import { API_BASE } from "@/lib/constants";
 import type { BotAction } from "@/types";
 
 const actionVariant: Record<string, "buy" | "sell" | "success" | "error" | "warning" | "default"> = {
@@ -22,22 +22,15 @@ export function ActivityFeed() {
   const { data, isLoading } = useActivity(1);
   const [liveActions, setLiveActions] = useState<BotAction[]>([]);
 
-  useEffect(() => {
-    const eventSource = new EventSource(`${API_BASE}/activity/live`);
-
-    eventSource.onmessage = (event) => {
-      try {
-        const action = JSON.parse(event.data) as BotAction;
-        if (action.id) {
-          setLiveActions((prev) => [action, ...prev].slice(0, 20));
-        }
-      } catch {
-        // ignore parse errors
-      }
-    };
-
-    return () => eventSource.close();
+  const onSSEMessage = useCallback((data: unknown) => {
+    const event = data as Record<string, unknown>;
+    if (event.type === "PULSE" || event.type === "connected") return;
+    const action = event as unknown as BotAction;
+    if (action.id && action.action) {
+      setLiveActions((prev) => [action, ...prev].slice(0, 20));
+    }
   }, []);
+  useSSE(onSSEMessage);
 
   const allActions = [...liveActions, ...(data?.data || [])].slice(0, 20);
 

@@ -1,24 +1,23 @@
 import { Router, Request, Response } from "express";
-import { prisma } from "../config/database";
+import { supabase } from "../config/database";
+import { evaluateToken } from "../scanner/evaluator";
 
 const router = Router();
 
-// Get recently discovered tokens for the bot to evaluate
 router.get("/new-tokens", async (req: Request, res: Response) => {
   try {
     const since = req.query.since
-      ? new Date(req.query.since as string)
-      : new Date(Date.now() - 60 * 60 * 1000); // default: last hour
+      ? new Date(req.query.since as string).toISOString()
+      : new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
-    const tokens = await prisma.token.findMany({
-      where: {
-        discoveredAt: { gte: since },
-        score: null, // not yet evaluated
-      },
-      orderBy: { discoveredAt: "desc" },
-      take: 50,
-    });
+    const { data: tokens, error } = await supabase
+      .from("Token")
+      .select("*")
+      .gte("discoveredAt", since)
+      .order("discoveredAt", { ascending: false })
+      .limit(50);
 
+    if (error) throw error;
     res.json(tokens);
   } catch (err) {
     console.error("New tokens error:", err);
@@ -26,19 +25,31 @@ router.get("/new-tokens", async (req: Request, res: Response) => {
   }
 });
 
-// Get pre-computed evaluation for a token
 router.get("/token/:address/evaluate", async (req: Request, res: Response) => {
   try {
-    const token = await prisma.token.findUnique({
-      where: { address: req.params.address as string },
-    });
+    const address = req.params.address as string;
 
+    // Re-evaluate the token with fresh data from nad.fun
+    const evaluation = await evaluateToken(address.toLowerCase());
+
+    if (!evaluation) {
+      res.status(404).json({ error: "Token not found" });
+      return;
+    }
+
+    // Fetch the updated token
+    const { data: token, error } = await supabase
+      .from("Token")
+      .select("*")
+      .eq("address", address.toLowerCase())
+      .maybeSingle();
+
+    if (error) throw error;
     if (!token) {
       res.status(404).json({ error: "Token not found" });
       return;
     }
 
-    // Return token with its score
     res.json({
       address: token.address,
       name: token.name,
@@ -49,6 +60,7 @@ router.get("/token/:address/evaluate", async (req: Request, res: Response) => {
       holderCount: token.holderCount,
       marketType: token.marketType,
       discoveredAt: token.discoveredAt,
+      evaluation,
     });
   } catch (err) {
     console.error("Token evaluate error:", err);

@@ -219,3 +219,270 @@ body::after {
 .stage-pulse {
   animation: stage-pulse 2s ease-in-out infinite;
 }
+
+/* ---- Viral Effects ---- */
+
+/* Glow card hover */
+.glow-card {
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.glow-card:hover {
+  box-shadow: 0 0 20px rgba(246, 198, 91, 0.08), 0 0 40px rgba(246, 198, 91, 0.04);
+  border-color: rgba(246, 198, 91, 0.15);
+}
+
+/* Animated gradient border */
+@keyframes border-rotate {
+  0% { --border-angle: 0deg; }
+  100% { --border-angle: 360deg; }
+}
+
+@property --border-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.glow-border {
+  position: relative;
+  background: var(--color-charcoal);
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.glow-border::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: conic-gradient(from var(--border-angle), transparent 60%, rgba(246, 198, 91, 0.3) 80%, rgba(255, 138, 61, 0.2) 90%, transparent 100%);
+  z-index: -1;
+  animation: border-rotate 4s linear infinite;
+}
+
+/* Number pulse — fires on value change */
+@keyframes number-pulse {
+  0% { transform: scale(1); text-shadow: 0 0 0 transparent; }
+  30% { transform: scale(1.08); text-shadow: 0 0 12px rgba(246, 198, 91, 0.5); }
+  100% { transform: scale(1); text-shadow: 0 0 0 transparent; }
+}
+
+.number-pulse {
+  animation: number-pulse 0.5s ease-out;
+}
+
+/* Glow text */
+.glow-text {
+  text-shadow: 0 0 8px rgba(246, 198, 91, 0.3), 0 0 20px rgba(246, 198, 91, 0.1);
+}
+
+/* Scanline overlay for terminal */
+.scanlines {
+  position: relative;
+  overflow: hidden;
+}
+
+.scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(246, 198, 91, 0.015) 2px,
+    rgba(246, 198, 91, 0.015) 4px
+  );
+  animation: scanline-drift 8s linear infinite;
+}
+
+@keyframes scanline-drift {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(20px); }
+}
+
+/* Row flash for terminal BUY/SELL */
+@keyframes row-flash-gold {
+  0% { background-color: rgba(246, 198, 91, 0.15); }
+  100% { background-color: transparent; }
+}
+
+@keyframes row-flash-red {
+  0% { background-color: rgba(178, 30, 43, 0.15); }
+  100% { background-color: transparent; }
+}
+
+.row-flash-buy {
+  animation: row-flash-gold 1.5s ease-out forwards;
+}
+
+.row-flash-sell {
+  animation: row-flash-red 1.5s ease-out forwards;
+}
+
+/* Thinking dots */
+@keyframes thinking-dots {
+  0%, 20% { content: "."; }
+  40% { content: ".."; }
+  60%, 100% { content: "..."; }
+}
+
+.thinking-dots::after {
+  content: ".";
+  animation: thinking-dots 1.5s steps(1) infinite;
+}
+
+/* Shimmer sweep */
+@keyframes shimmer-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(246, 198, 91, 0.04) 50%,
+    transparent 60%
+  );
+  animation: shimmer-sweep 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Marquee ticker */
+@keyframes ticker-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.ticker-scroll {
+  animation: ticker-scroll 30s linear infinite;
+}
+
+.ticker-scroll:hover {
+  animation-play-state: paused;
+}
+
+/* Live heartbeat — stronger pulse for LIVE indicators */
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  15% { transform: scale(1.6); opacity: 0.8; }
+  30% { transform: scale(1); opacity: 1; }
+  45% { transform: scale(1.3); opacity: 0.9; }
+  60% { transform: scale(1); opacity: 1; }
+}
+
+.heartbeat {
+  animation: heartbeat 2s ease-in-out infinite;
+}
+
+/* Staggered card entrance */
+.stagger-1 { animation-delay: 0ms; }
+.stagger-2 { animation-delay: 60ms; }
+.stagger-3 { animation-delay: 120ms; }
+.stagger-4 { animation-delay: 180ms; }
+.stagger-5 { animation-delay: 240ms; }
+.stagger-6 { animation-delay: 300ms; }
+
+/* Breathing radial glow behind hero */
+@keyframes radial-breathe {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.05); }
+}
+
+.radial-breathe {
+  animation: radial-breathe 6s ease-in-out infinite;
+}
+
+/* Discovery toast notification */
+@keyframes toast-enter {
+  0% { transform: translateX(120%); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes toast-exit {
+  0% { transform: translateX(0); opacity: 1; }
+  100% { transform: translateX(120%); opacity: 0; }
+}
+
+@keyframes lightning-flash {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  20% { opacity: 0.3; }
+  30% { opacity: 1; }
+  50% { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+.toast-enter {
+  animation: toast-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.toast-exit {
+  animation: toast-exit 0.3s ease-in forwards;
+}
+
+.lightning-flash {
+  animation: lightning-flash 0.6s ease-out forwards;
+}
+
+/* Neural Cortex */
+@keyframes cortex-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes cortex-line-enter {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.cortex-shimmer {
+  background-size: 200% 100%;
+  animation: cortex-shimmer 3s linear infinite;
+}
+
+.cortex-line {
+  animation: cortex-line-enter 0.3s ease-out;
+}
+
+/* Telegram Popup */
+@keyframes telegram-fab-enter {
+  0% { opacity: 0; transform: scale(0.5) translateY(20px); }
+  60% { opacity: 1; transform: scale(1.1) translateY(0); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes telegram-popup-enter {
+  0% { opacity: 0; transform: translateY(8px) scale(0.95); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes telegram-ping {
+  0% { transform: scale(1); opacity: 0.6; }
+  75% { transform: scale(1.8); opacity: 0; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+.telegram-fab-enter {
+  animation: telegram-fab-enter 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.telegram-popup-enter {
+  animation: telegram-popup-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.telegram-ping {
+  animation: telegram-ping 2.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}

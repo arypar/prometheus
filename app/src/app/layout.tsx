@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Cinzel, Cormorant_Garamond, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/layout/Navbar";
+import { TelegramPopup } from "@/components/ui/TelegramPopup";
+import { SSEProvider } from "@/hooks/useSSE";
 
 const cinzel = Cinzel({
   subsets: ["latin"],
@@ -40,8 +42,11 @@ export default function RootLayout({
       <body
         className={`${cinzel.variable} ${cormorant.variable} ${inter.variable} ${jetbrainsMono.variable} font-[var(--font-body)] antialiased bg-obsidian text-ivory`}
       >
-        <Navbar />
-        <main className="pt-16">{children}</main>
+        <SSEProvider>
+          <Navbar />
+          <main className="pt-16">{children}</main>
+          <TelegramPopup />
+        </SSEProvider>
       </body>
     </html>
   );

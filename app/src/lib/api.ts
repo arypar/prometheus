@@ -12,6 +12,8 @@ import type {
   RoiByToken,
   VolumeData,
   ActivityStats,
+  WalletInfo,
+  PulseMessage,
 } from "@/types";
 
 async function fetchAPI<T>(path: string): Promise<T> {
@@ -53,4 +55,10 @@ export const api = {
     return fetchAPI<PaginatedResponse<BotAction>>(`/activity?${params}`);
   },
   getActivityStats: () => fetchAPI<ActivityStats>("/activity/stats"),
+
+  // Wallet / on-chain
+  getWalletInfo: () => fetchAPI<WalletInfo>("/wallet"),
+
+  // Pulse feed
+  getPulse: () => fetchAPI<PulseMessage[]>("/pulse"),
 };

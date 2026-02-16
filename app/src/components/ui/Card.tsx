@@ -1,14 +1,22 @@
 import { cn } from "@/lib/utils";
 
+interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
+  variant?: "default" | "glow" | "pulse";
+}
+
 export function Card({
   className,
+  variant = "default",
   children,
   ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
+}: CardProps) {
   return (
     <div
       className={cn(
-        "bg-charcoal border border-ash rounded-xl p-4",
+        "bg-charcoal border border-ash/60 rounded-xl p-4 transition-all duration-300",
+        variant === "default" && "glow-card",
+        variant === "glow" && "glow-border rounded-xl",
+        variant === "pulse" && "glow-card shimmer",
         className
       )}
       {...props}

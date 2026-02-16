@@ -9,8 +9,8 @@ import analyticsRoutes from "./routes/analytics";
 import botRoutes from "./routes/bot";
 import activityRoutes from "./routes/activity";
 import scannerRoutes from "./routes/scanner";
-import { startScheduledJobs } from "./jobs";
-import { startStreamListener } from "./scanner/streamListener";
+import walletRoutes from "./routes/wallet";
+import pulseRoutes from "./routes/pulse";
 
 const app = express();
 
@@ -30,6 +30,12 @@ app.use("/api/tokens", tokenRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/activity", activityRoutes);
 
+// Wallet / on-chain data
+app.use("/api/wallet", walletRoutes);
+
+// Worker pulse feed
+app.use("/api/pulse", pulseRoutes);
+
 // Bot-facing routes
 app.use("/api/bot", botRoutes);
 
@@ -40,9 +46,5 @@ app.use("/api/scanner", scannerRoutes);
 app.use(errorHandler);
 
 app.listen(env.PORT, () => {
-  console.log(`[Server] Prometheus backend running on port ${env.PORT}`);
-
-  // Start background services
-  startScheduledJobs();
-  startStreamListener();
+  console.log(`[API] Prometheus API server running on port ${env.PORT}`);
 });

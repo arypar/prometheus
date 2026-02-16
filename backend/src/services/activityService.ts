@@ -1,48 +1,36 @@
-import { prisma } from "../config/database";
+import { supabase } from "../config/database";
 import { PaginatedResponse } from "../types";
-import { BotAction } from "@prisma/client";
 
 export async function getActivityLog(
   page: number = 1,
   pageSize: number = 50,
   actionType?: string,
   tokenAddress?: string
-): Promise<PaginatedResponse<BotAction>> {
-  const where: Record<string, unknown> = {};
+): Promise<PaginatedResponse<any>> {
+  let query = supabase
+    .from("BotAction")
+    .select(
+      "*, token:Token(name, symbol, currentPrice, marketCap, volume24h, holderCount, score)",
+      { count: "exact" }
+    )
+    .order("timestamp", { ascending: false })
+    .range((page - 1) * pageSize, page * pageSize - 1);
 
   if (actionType && actionType !== "ALL") {
-    where.action = actionType;
+    query = query.eq("action", actionType);
   }
 
   if (tokenAddress) {
-    where.tokenAddress = tokenAddress;
+    query = query.eq("tokenAddress", tokenAddress);
   }
 
-  const [data, total] = await Promise.all([
-    prisma.botAction.findMany({
-      where,
-      orderBy: { timestamp: "desc" },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      include: {
-        token: {
-          select: {
-            name: true,
-            symbol: true,
-            currentPrice: true,
-            marketCap: true,
-            volume24h: true,
-            holderCount: true,
-            score: true,
-          },
-        },
-      },
-    }),
-    prisma.botAction.count({ where }),
-  ]);
+  const { data, count, error } = await query;
+  if (error) throw error;
+
+  const total = count || 0;
 
   return {
-    data,
+    data: data || [],
     total,
     page,
     pageSize,

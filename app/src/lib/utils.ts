@@ -19,9 +19,13 @@ export function shortenAddress(address: string, chars = 4): string {
 }
 
 export function timeAgo(dateString: string): string {
-  const date = new Date(dateString);
+  // Supabase returns timestamps without timezone — treat as UTC
+  const normalized = dateString.endsWith("Z") || dateString.includes("+")
+    ? dateString
+    : dateString + "Z";
+  const date = new Date(normalized);
   const now = new Date();
-  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  const seconds = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 1000));
 
   if (seconds < 60) return `${seconds}s ago`;
   const minutes = Math.floor(seconds / 60);

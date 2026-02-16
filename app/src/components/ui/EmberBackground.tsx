@@ -1,6 +1,14 @@
 export function EmberBackground() {
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden z-0" aria-hidden="true">
+      {/* Breathing radial glow behind hero */}
+      <div
+        className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] radial-breathe"
+        style={{
+          background: "radial-gradient(ellipse at center, rgba(246, 198, 91, 0.04) 0%, transparent 70%)",
+        }}
+      />
+
       {/* Smoke wisps */}
       <div
         className="absolute inset-0"
@@ -16,23 +24,41 @@ export function EmberBackground() {
           animation: "smoke-drift 25s ease-in-out infinite reverse",
         }}
       />
+      <div
+        className="absolute inset-0"
+        style={{
+          background: "radial-gradient(ellipse at 50% 80%, rgba(255, 138, 61, 0.05) 0%, transparent 40%)",
+          animation: "smoke-drift 30s ease-in-out infinite",
+        }}
+      />
 
-      {/* Floating ember particles */}
-      {[...Array(12)].map((_, i) => (
-        <div
-          key={i}
-          className="absolute rounded-full"
-          style={{
-            width: `${2 + (i % 3)}px`,
-            height: `${2 + (i % 3)}px`,
-            left: `${8 + i * 7.5}%`,
-            bottom: `-${10 + (i % 4) * 5}px`,
-            background: i % 3 === 0 ? "#F6C65B" : i % 3 === 1 ? "#FF8A3D" : "#FFD87A",
-            animation: `ember-float ${8 + i * 2}s linear infinite`,
-            animationDelay: `${i * 1.5}s`,
-          }}
-        />
-      ))}
+      {/* Floating ember particles — 20 particles with varied sizes */}
+      {[...Array(20)].map((_, i) => {
+        const isBurst = i % 7 === 0;
+        const size = isBurst ? 3 + (i % 4) * 1.5 : 1 + (i % 4);
+        const speed = isBurst ? 5 + i * 0.8 : 8 + i * 1.5;
+        const opacity = isBurst ? 0.9 : 0.7;
+        const colors = ["#F6C65B", "#FF8A3D", "#FFD87A", "#F6C65B", "#FF8A3D"];
+
+        return (
+          <div
+            key={i}
+            className="absolute rounded-full"
+            style={{
+              width: `${size}px`,
+              height: `${size}px`,
+              left: `${3 + i * 4.8}%`,
+              bottom: `-${10 + (i % 5) * 5}px`,
+              background: colors[i % colors.length],
+              opacity,
+              filter: isBurst ? "blur(0.5px)" : "none",
+              boxShadow: isBurst ? `0 0 ${size * 2}px ${colors[i % colors.length]}40` : "none",
+              animation: `ember-float ${speed}s linear infinite`,
+              animationDelay: `${i * 1.2}s`,
+            }}
+          />
+        );
+      })}
     </div>
   );
 }

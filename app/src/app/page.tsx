@@ -1,159 +1,130 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
-import { Flame, ExternalLink } from "lucide-react";
+import { Flame, ExternalLink, ArrowUpRight, ArrowDownRight, Wallet, Copy, Check, Zap } from "lucide-react";
 import { EmberBackground } from "@/components/ui/EmberBackground";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { PortfolioChart } from "@/components/dashboard/PortfolioChart";
 import { AgentTerminal } from "@/components/dashboard/AgentTerminal";
-import { AgentInsights } from "@/components/dashboard/AgentInsights";
-import { usePortfolioOverview, useHoldings, useTransactions, useActivity } from "@/hooks/useData";
-import { LoadingState } from "@/components/ui/LoadingState";
+import { AgentSentiment } from "@/components/dashboard/AgentSentiment";
+import { InvestmentCycle } from "@/components/dashboard/InvestmentCycle";
+import { StatsGrid } from "@/components/dashboard/StatsGrid";
+import { NeuralCortex } from "@/components/dashboard/NeuralCortex";
+import { usePortfolioOverview, useHoldings, useActivity, useActivityStats, useWalletInfo } from "@/hooks/useData";
+import { useSSE } from "@/hooks/useSSE";
 import { formatMON, formatPercent, shortenAddress, timeAgo } from "@/lib/utils";
-import { EXPLORER_URL, API_BASE } from "@/lib/constants";
+import { EXPLORER_URL, WALLET_ADDRESS } from "@/lib/constants";
 import type { BotAction } from "@/types";
 
-function useScrollReveal() {
-  const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) setVisible(true); },
-      { threshold: 0.1 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  return { ref, visible };
-}
-
-function SectionDivider() {
-  return <div className="divider-glyph" aria-hidden="true">&loz;</div>;
-}
-
-/* ── Hero (two-column: branding + terminal) ──────────── */
-function HeroSection() {
+/* ── Hero Banner ─────────────────────────────────────── */
+function HeroBanner() {
   const { data: overview } = usePortfolioOverview();
-  const { data: lastAction } = useActivity(1);
-  const lastDecision = lastAction?.data?.[0];
+  const { data: stats } = useActivityStats();
+  const { data: wallet } = useWalletInfo();
+  const [copied, setCopied] = useState(false);
 
-  const miniStats = [
-    {
-      label: "Capital Deployed",
-      value: overview ? `${formatMON(overview.totalInvested)} MON` : "—",
-    },
-    {
-      label: "Active Investments",
-      value: overview ? overview.activePositions.toString() : "—",
-    },
-    {
-      label: "Last Decision",
-      value: lastDecision ? `${lastDecision.action} ${timeAgo(lastDecision.timestamp)}` : "—",
-    },
-  ];
+  const portfolioVal = overview ? parseFloat(overview.totalValueMon) : 0;
+  const totalPnl = overview ? parseFloat(overview.totalPnl) : 0;
+  const isPnlPositive = totalPnl >= 0;
+  const walletBalance = wallet ? parseFloat(wallet.balance) : overview ? parseFloat(overview.walletBalance) : 0;
+  const displayAddress = wallet?.address || WALLET_ADDRESS;
+
+  function handleCopy() {
+    if (!displayAddress) return;
+    navigator.clipboard.writeText(displayAddress).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
 
   return (
-    <section className="relative min-h-screen flex items-center smoke-gradient overflow-hidden">
-      <EmberBackground />
-      <div className="relative z-10 w-full max-w-6xl mx-auto px-6 py-20 grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
-        {/* Left: Branding */}
+    <div className="relative card-rise">
+      {/* Top: branding + wallet address */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+        <div className="flex items-center gap-4">
+          <Flame className="w-8 h-8 text-torch-gold flame-flicker shrink-0" />
+          <div>
+            <h1 className="font-[var(--font-display)] text-2xl md:text-3xl text-torch-gold tracking-wider">
+              Prometheus
+            </h1>
+            <p className="text-xs text-stone font-[var(--font-heading)] mt-0.5">
+              Autonomous AI Venture Capital on Monad
+            </p>
+          </div>
+        </div>
+        {displayAddress && (
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 bg-charcoal border border-ash/50 rounded-lg px-3 py-1.5">
+              <Wallet className="w-3 h-3 text-torch-gold" />
+              <span className="text-[11px] font-[var(--font-mono)] text-stone">
+                {shortenAddress(displayAddress)}
+              </span>
+              <button onClick={handleCopy} className="text-stone hover:text-torch-gold transition-colors ml-1">
+                {copied ? <Check className="w-3 h-3 text-torch-gold" /> : <Copy className="w-3 h-3" />}
+              </button>
+            </div>
+            <a
+              href={`${EXPLORER_URL}/address/${displayAddress}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 bg-charcoal border border-ash/50 rounded-lg px-2.5 py-1.5 text-stone hover:text-torch-gold hover:border-torch-gold/30 transition-colors"
+            >
+              <ExternalLink className="w-3 h-3" />
+              <span className="text-[10px]">Explorer</span>
+            </a>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom: key stats row */}
+      <div className="flex flex-wrap items-center gap-6 md:gap-8">
         <div>
-          <h1 className="font-[var(--font-display)] text-4xl md:text-6xl lg:text-7xl text-torch-gold leading-tight divine-breathe">
-            Prometheus
-          </h1>
-          <p className="mt-6 text-lg md:text-xl text-stone font-[var(--font-heading)] max-w-xl">
-            An autonomous AI venture capitalist, seeding and investing in tokens on the Monad blockchain. Profits fuel further investment.
+          <p className="text-[9px] text-stone uppercase tracking-wider">Wallet Balance</p>
+          <p className="text-lg font-bold font-[var(--font-mono)] text-flame glow-text">
+            <AnimatedNumber value={walletBalance} decimals={4} suffix=" MON" />
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Link
-              href="/portfolio"
-              className="inline-flex items-center gap-2 px-8 py-3 bg-torch-gold/10 border border-torch-gold/30 text-torch-gold rounded-lg hover:bg-torch-gold/20 transition-colors text-sm tracking-wider"
-            >
-              <Flame className="w-4 h-4" />
-              View Portfolio
-            </Link>
-            <Link
-              href="/decisions"
-              className="inline-flex items-center gap-2 px-8 py-3 border border-ash text-stone rounded-lg hover:text-ivory hover:border-stone/30 transition-colors text-sm tracking-wider"
-            >
-              View Decisions
-            </Link>
-          </div>
-          {/* Mini stats */}
-          <div className="mt-10 grid grid-cols-3 gap-4">
-            {miniStats.map((s) => (
-              <div key={s.label}>
-                <p className="text-lg font-bold font-[var(--font-mono)] text-torch-gold">{s.value}</p>
-                <p className="text-[10px] text-stone uppercase tracking-wider mt-0.5">{s.label}</p>
-              </div>
-            ))}
-          </div>
         </div>
-
-        {/* Right: Terminal */}
-        <div className="lg:pl-4">
-          <AgentTerminal />
+        <div className="w-px h-8 bg-ash/40 hidden md:block" />
+        <div>
+          <p className="text-[9px] text-stone uppercase tracking-wider">Portfolio Value</p>
+          <p className="text-lg font-bold font-[var(--font-mono)] text-torch-gold glow-text">
+            <AnimatedNumber value={portfolioVal} decimals={2} suffix=" MON" />
+          </p>
+        </div>
+        <div className="w-px h-8 bg-ash/40 hidden md:block" />
+        <div>
+          <p className="text-[9px] text-stone uppercase tracking-wider">Total P&L</p>
+          <p className={`text-lg font-bold font-[var(--font-mono)] flex items-center gap-1 ${isPnlPositive ? "text-torch-gold" : "text-prometheus-red"}`}>
+            {isPnlPositive ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
+            <AnimatedNumber value={Math.abs(totalPnl)} decimals={2} prefix={isPnlPositive ? "+" : "-"} suffix=" MON" />
+          </p>
+        </div>
+        <div className="w-px h-8 bg-ash/40 hidden md:block" />
+        <div>
+          <p className="text-[9px] text-stone uppercase tracking-wider">On-Chain Txns</p>
+          <p className="text-lg font-bold font-[var(--font-mono)] text-stone">
+            {wallet?.txCount ?? 0}
+          </p>
+        </div>
+        <div className="w-px h-8 bg-ash/40 hidden md:block" />
+        <div>
+          <p className="text-[9px] text-stone uppercase tracking-wider">Actions Today</p>
+          <p className="text-lg font-bold font-[var(--font-mono)] text-flame">
+            {stats ? (stats.todayBuys + stats.todayEvaluations) : 0}
+          </p>
         </div>
       </div>
-    </section>
+    </div>
   );
 }
 
-/* ── Thesis ───────────────────────────────────────────── */
-function ThesisSection() {
-  const reveal = useScrollReveal();
-
-  return (
-    <section ref={reveal.ref} className={`py-16 px-6 ${reveal.visible ? "card-rise" : "opacity-0"}`}>
-      <div className="max-w-3xl mx-auto">
-        <Card className="p-8 md:p-12">
-          <h2 className="font-[var(--font-heading)] text-2xl md:text-3xl text-flame mb-6">
-            What Prometheus Sees
-          </h2>
-          <div className="space-y-4 text-stone leading-relaxed">
-            <p>
-              Prometheus scans the Monad blockchain for newly launched tokens, evaluating each one
-              through on-chain metrics — holder distribution, liquidity depth, trading volume
-              patterns, and creator history.
-            </p>
-            <p>
-              Tokens that pass evaluation receive a conviction score. When the score exceeds
-              threshold, Prometheus invests — seeding promising projects with calculated sizing,
-              then using earned fees to fuel further investments in a self-sustaining cycle.
-            </p>
-            <p>
-              Every decision is logged, every trade is transparent. Prometheus operates with full
-              autonomy and full accountability.
-            </p>
-          </div>
-        </Card>
-      </div>
-    </section>
-  );
-}
-
-/* ── Agent Insights (Sentiment + Cycle) ──────────────── */
-function AgentInsightsSection() {
-  const reveal = useScrollReveal();
-
-  return (
-    <section ref={reveal.ref} className={`py-16 px-6 ${reveal.visible ? "card-rise" : "opacity-0"}`}>
-      <AgentInsights />
-    </section>
-  );
-}
-
-/* ── Live Decision Feed ───────────────────────────────── */
-function LiveDecisionFeedSection() {
+/* ── Live Decision Feed ──────────────────────────────── */
+function LiveFeed() {
   const { data } = useActivity(1);
   const [liveActions, setLiveActions] = useState<BotAction[]>([]);
-  const reveal = useScrollReveal();
 
   const actionVariant: Record<string, "buy" | "sell" | "warning" | "error" | "default"> = {
     BUY: "buy",
@@ -165,197 +136,239 @@ function LiveDecisionFeedSection() {
     THINK: "default",
   };
 
-  useEffect(() => {
-    const es = new EventSource(`${API_BASE}/activity/live`);
-    es.onmessage = (event) => {
-      try {
-        const action = JSON.parse(event.data) as BotAction;
-        if (action.id) setLiveActions((prev) => [action, ...prev].slice(0, 20));
-      } catch { /* ignore */ }
-    };
-    return () => es.close();
+  const onSSEMessage = useCallback((data: unknown) => {
+    const event = data as Record<string, unknown>;
+    if (event.type === "PULSE" || event.type === "connected") return;
+    const action = event as unknown as BotAction;
+    if (action.id && action.action) setLiveActions((prev) => [action, ...prev].slice(0, 20));
+  }, []);
+  useSSE(onSSEMessage);
+
+  const allActions = [...liveActions, ...(data?.data || [])].slice(0, 15);
+
+  return (
+    <Card variant="glow" className="flex flex-col h-full min-h-[420px] p-0 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-ash/50 bg-charcoal/80">
+        <span className="text-[10px] text-stone uppercase tracking-widest font-[var(--font-mono)]">
+          Live Decisions
+        </span>
+        <div className="flex items-center gap-1.5">
+          <div className="w-1.5 h-1.5 rounded-full bg-torch-gold heartbeat" />
+          <span className="text-[9px] text-torch-gold font-[var(--font-mono)] font-semibold">LIVE</span>
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto divide-y divide-ash/20">
+        {!allActions.length ? (
+          <div className="flex items-center justify-center h-full text-stone text-xs">
+            Waiting for decisions...
+          </div>
+        ) : (
+          allActions.map((action) => (
+            <div key={action.id} className="flex items-center gap-2.5 px-3 py-2 hover:bg-ash/10 transition-colors">
+              <Badge variant={actionVariant[action.action] || "default"}>
+                {action.action}
+              </Badge>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] text-ivory truncate">
+                  {action.token?.symbol || (action.tokenAddress ? shortenAddress(action.tokenAddress) : "System")}
+                </p>
+                {action.reasoning && (
+                  <p className="text-[9px] text-stone truncate">{action.reasoning}</p>
+                )}
+              </div>
+              <span className="text-[9px] text-stone whitespace-nowrap shrink-0">
+                {timeAgo(action.timestamp)}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+      <div className="border-t border-ash/30 px-3 py-1.5 bg-charcoal/40 text-center">
+        <Link href="/decisions" className="text-[10px] text-stone hover:text-torch-gold transition-colors">
+          View all decisions &rarr;
+        </Link>
+      </div>
+    </Card>
+  );
+}
+
+/* ── Holdings Grid ───────────────────────────────────── */
+function HoldingsGrid() {
+  const { data: holdings } = useHoldings();
+
+  if (!holdings?.length) {
+    return (
+      <Card className="p-4">
+        <h3 className="text-[10px] text-stone uppercase tracking-wider mb-3">Holdings</h3>
+        <p className="text-xs text-stone/60 text-center py-4">No active positions</p>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-[10px] text-stone uppercase tracking-wider">Holdings</h3>
+        <Link href="/portfolio" className="text-[9px] text-stone hover:text-torch-gold transition-colors">
+          View all &rarr;
+        </Link>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        {holdings.slice(0, 6).map((h) => {
+          const pnl = parseFloat(h.unrealizedPnl);
+          const isProfitable = pnl >= 0;
+          return (
+            <Link key={h.id} href={`/tokens/${h.tokenAddress}`}>
+              <div className="glow-card border border-ash/40 rounded-lg p-2.5 hover:border-torch-gold/20 transition-all cursor-pointer group">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ring-1 ${isProfitable ? "bg-torch-gold/10 text-torch-gold ring-torch-gold/30" : "bg-prometheus-red/10 text-prometheus-red ring-prometheus-red/30"}`}>
+                    {h.token.symbol.slice(0, 2)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-ivory truncate group-hover:text-torch-gold transition-colors">{h.token.symbol}</p>
+                    <p className="text-[9px] text-stone truncate">{h.token.name}</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="text-stone">{formatMON(h.currentValue)}</span>
+                  <span className={`font-[var(--font-mono)] font-semibold ${isProfitable ? "text-torch-gold" : "text-prometheus-red"}`}>
+                    {formatPercent(h.roiPercent)}
+                  </span>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
+/* ── Discovery Toast Notifications ────────────────────── */
+interface DiscoveryEvent {
+  id: string;
+  name: string;
+  symbol: string;
+  address: string;
+  exiting: boolean;
+}
+
+function DiscoveryToasts() {
+  const [toasts, setToasts] = useState<DiscoveryEvent[]>([]);
+  const [flash, setFlash] = useState(false);
+  const toastId = useRef(0);
+
+  const addToast = useCallback((name: string, symbol: string, address: string) => {
+    const id = `discovery-${toastId.current++}`;
+    setToasts((prev) => [...prev.slice(-4), { id, name, symbol, address, exiting: false }]);
+
+    setFlash(true);
+    setTimeout(() => setFlash(false), 600);
+
+    setTimeout(() => {
+      setToasts((prev) => prev.map((t) => t.id === id ? { ...t, exiting: true } : t));
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, 300);
+    }, 5000);
   }, []);
 
-  const allActions = [...liveActions, ...(data?.data || [])].slice(0, 8);
+  const onSSEMessage = useCallback((data: unknown) => {
+    const msg = data as { type?: string; token?: { name: string; symbol: string; address: string } };
+    if (msg.type === "DISCOVERY" && msg.token) {
+      addToast(msg.token.name, msg.token.symbol, msg.token.address);
+    }
+  }, [addToast]);
+  useSSE(onSSEMessage);
 
   return (
-    <section ref={reveal.ref} className={`py-16 px-6 ${reveal.visible ? "card-rise" : "opacity-0"}`}>
-      <div className="max-w-3xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="font-[var(--font-display)] text-xl text-torch-gold">Live Decisions</h2>
-          <div className="flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-torch-gold pulse-glow" />
-            <span className="text-[10px] text-torch-gold">LIVE</span>
-          </div>
-        </div>
-        <Card className="p-0 overflow-hidden">
-          {!allActions.length ? (
-            <div className="p-8 text-center text-stone text-sm">Waiting for decisions...</div>
-          ) : (
-            <div className="divide-y divide-ash/30">
-              {allActions.map((action) => (
-                <div key={action.id} className="flex items-center gap-3 px-4 py-3">
-                  <Badge variant={actionVariant[action.action] || "default"}>
-                    {action.action}
-                  </Badge>
-                  <span className="text-sm text-ivory flex-1 min-w-0 truncate">
-                    {action.reasoning || action.token?.symbol || (action.tokenAddress ? shortenAddress(action.tokenAddress) : "System")}
-                  </span>
-                  <span className="text-xs text-stone whitespace-nowrap">
-                    {timeAgo(action.timestamp)}
-                  </span>
-                </div>
-              ))}
+    <>
+      {/* Screen flash on discovery */}
+      {flash && (
+        <div className="fixed inset-0 z-[60] pointer-events-none lightning-flash bg-torch-gold/[0.03]" />
+      )}
+
+      {/* Toast stack */}
+      <div className="fixed top-20 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`pointer-events-auto ${toast.exiting ? "toast-exit" : "toast-enter"}`}
+          >
+            <div className="flex items-center gap-3 bg-charcoal/95 backdrop-blur-md border border-torch-gold/20 rounded-lg px-4 py-3 shadow-[0_0_20px_rgba(246,198,91,0.1)]">
+              <div className="w-8 h-8 rounded-full bg-torch-gold/10 border border-torch-gold/30 flex items-center justify-center shrink-0">
+                <Zap className="w-4 h-4 text-torch-gold" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] text-torch-gold font-semibold uppercase tracking-wider">New Token Discovered</p>
+                <p className="text-xs text-ivory font-medium truncate">{toast.name} ({toast.symbol})</p>
+                <p className="text-[9px] text-stone font-[var(--font-mono)]">{shortenAddress(toast.address)}</p>
+              </div>
             </div>
-          )}
-        </Card>
-        <div className="text-center mt-4">
-          <Link href="/decisions" className="text-sm text-stone hover:text-torch-gold transition-colors">
-            View all decisions &rarr;
-          </Link>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ── Portfolio Grid ───────────────────────────────────── */
-function PortfolioGridSection() {
-  const { data: holdings, isLoading } = useHoldings();
-  const reveal = useScrollReveal();
-
-  return (
-    <section ref={reveal.ref} className={`py-16 px-6 ${reveal.visible ? "card-rise" : "opacity-0"}`}>
-      <div className="max-w-5xl mx-auto">
-        <h2 className="font-[var(--font-display)] text-xl md:text-2xl text-torch-gold text-center mb-8">
-          Holdings
-        </h2>
-        {isLoading ? (
-          <LoadingState />
-        ) : !holdings?.length ? (
-          <p className="text-center text-stone text-sm">No active positions</p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {holdings.slice(0, 6).map((h) => (
-              <Link key={h.id} href={`/tokens/${h.tokenAddress}`}>
-                <Card className="hover:border-torch-gold/30 transition-colors cursor-pointer">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-ash flex items-center justify-center text-xs font-bold text-torch-gold">
-                        {h.token.symbol.slice(0, 2)}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-ivory">{h.token.symbol}</p>
-                        <p className="text-[10px] text-stone">{h.token.name}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-stone">Value</span>
-                    <span className="text-ivory font-[var(--font-mono)]">{formatMON(h.currentValue)} MON</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs mt-1">
-                    <span className="text-stone">P&L</span>
-                    <span className={`font-[var(--font-mono)] ${parseFloat(h.unrealizedPnl) >= 0 ? "text-torch-gold" : "text-prometheus-red"}`}>
-                      {formatMON(h.unrealizedPnl)} ({formatPercent(h.roiPercent)})
-                    </span>
-                  </div>
-                </Card>
-              </Link>
-            ))}
           </div>
-        )}
-        <div className="text-center mt-6">
-          <Link href="/portfolio" className="text-sm text-stone hover:text-torch-gold transition-colors">
-            View full portfolio &rarr;
-          </Link>
-        </div>
+        ))}
       </div>
-    </section>
+    </>
   );
 }
 
-/* ── Recent Trades ────────────────────────────────────── */
-function RecentTradesSection() {
-  const { data } = useTransactions(1, "ALL");
-  const reveal = useScrollReveal();
-
-  const txs = data?.data?.slice(0, 8) || [];
-
-  return (
-    <section ref={reveal.ref} className={`py-16 px-6 ${reveal.visible ? "card-rise" : "opacity-0"}`}>
-      <div className="max-w-3xl mx-auto">
-        <h2 className="font-[var(--font-display)] text-xl text-torch-gold text-center mb-8">
-          Recent Trades
-        </h2>
-        {!txs.length ? (
-          <p className="text-center text-stone text-sm">No trades yet</p>
-        ) : (
-          <Card className="p-0 overflow-hidden">
-            <div className="divide-y divide-ash/30">
-              {txs.map((tx) => (
-                <div key={tx.id} className="flex items-center justify-between px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <Badge variant={tx.type === "BUY" ? "buy" : "sell"}>{tx.type}</Badge>
-                    <span className="text-sm text-ivory">{tx.token?.symbol || shortenAddress(tx.tokenAddress)}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-ivory font-[var(--font-mono)]">{formatMON(tx.monAmount)} MON</span>
-                    <span className="text-xs text-stone">{timeAgo(tx.timestamp)}</span>
-                    <a
-                      href={`${EXPLORER_URL}/tx/${tx.txHash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-stone hover:text-torch-gold"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
-      </div>
-    </section>
-  );
-}
-
-/* ── Portfolio Chart ──────────────────────────────────── */
-function PortfolioChartSection() {
-  const reveal = useScrollReveal();
-
-  return (
-    <section ref={reveal.ref} className={`py-16 px-6 ${reveal.visible ? "card-rise" : "opacity-0"}`}>
-      <div className="max-w-4xl mx-auto">
-        <h2 className="font-[var(--font-display)] text-xl text-torch-gold text-center mb-8">
-          Performance
-        </h2>
-        <PortfolioChart />
-      </div>
-    </section>
-  );
-}
-
-/* ── Main Page ────────────────────────────────────────── */
+/* ── Main Page ───────────────────────────────────────── */
 export default function HomePage() {
+  const { data: overview } = usePortfolioOverview();
+
   return (
-    <div className="bg-obsidian">
-      <HeroSection />
-      <SectionDivider />
-      <ThesisSection />
-      <SectionDivider />
-      <AgentInsightsSection />
-      <SectionDivider />
-      <LiveDecisionFeedSection />
-      <SectionDivider />
-      <PortfolioGridSection />
-      <SectionDivider />
-      <RecentTradesSection />
-      <SectionDivider />
-      <PortfolioChartSection />
-      <div className="py-16 text-center text-stone text-xs">
-        <p className="font-[var(--font-heading)]">Prometheus &mdash; Autonomous AI Venture Capital</p>
+    <div className="bg-obsidian min-h-screen relative">
+      <EmberBackground />
+      <DiscoveryToasts />
+
+      <div className="relative z-10 max-w-[1400px] mx-auto px-4 md:px-6 pt-24 pb-8">
+        {/* Hero Banner */}
+        <HeroBanner />
+
+        {/* Stats Row */}
+        {overview && (
+          <div className="mt-5 card-rise stagger-1">
+            <StatsGrid data={overview} />
+          </div>
+        )}
+
+        {/* Terminal + Live Feed side-by-side */}
+        <div className="mt-5 grid grid-cols-1 lg:grid-cols-5 gap-4">
+          <div className="lg:col-span-3 card-rise stagger-2">
+            <AgentTerminal />
+          </div>
+          <div className="lg:col-span-2 card-rise stagger-3">
+            <LiveFeed />
+          </div>
+        </div>
+
+        {/* Neural Cortex — live system activity */}
+        <div className="mt-4 card-rise stagger-4">
+          <NeuralCortex />
+        </div>
+
+        {/* Sentiment + Pipeline + Holdings */}
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="card-rise stagger-5">
+            <AgentSentiment />
+          </div>
+          <div className="card-rise stagger-6">
+            <InvestmentCycle />
+          </div>
+          <div className="card-rise stagger-6">
+            <HoldingsGrid />
+          </div>
+        </div>
+
+        {/* Performance Chart */}
+        <div className="mt-4 card-rise">
+          <PortfolioChart />
+        </div>
+
+        {/* Footer */}
+        <div className="mt-6 py-4 text-center text-stone text-[10px] border-t border-ash/20">
+          <p className="font-[var(--font-heading)]">Prometheus &mdash; Autonomous AI Venture Capital on Monad</p>
+        </div>
       </div>
     </div>
   );
