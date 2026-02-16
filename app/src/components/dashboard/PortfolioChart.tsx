@@ -124,7 +124,7 @@ export function PortfolioChart() {
   const gradientId = `portfolio-gradient-${period}`;
 
   const handleMouseMove = useCallback(
-    (nextState: { activeTooltipIndex?: number | undefined }) => {
+    (nextState: Record<string, unknown>) => {
       const idx = nextState?.activeTooltipIndex;
       if (idx != null && typeof idx === "number" && chartData[idx]) {
         const p = chartData[idx];

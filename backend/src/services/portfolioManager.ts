@@ -11,15 +11,16 @@ import { logBotAction, recordTransaction } from "./botService";
 import { pulse } from "../utils/pulse";
 
 // --- Timing ---
-const MONITOR_INTERVAL_MS = 20_000;        // lightweight scan every 20s
-const MIN_DECISION_GAP_MS = 3 * 60_000;   // at least 3 min between AI decisions
-const MAX_DECISION_GAP_MS = 5 * 60_000;   // force a decision check after 5 min of silence
-const COOLDOWN_MS = 10 * 60_000;           // don't re-trade same token within 10 min
+const MONITOR_INTERVAL_MS = 30_000;        // lightweight scan every 30s
+const MIN_DECISION_GAP_MS = 8 * 60_000;   // at least 8 min between AI decisions
+const MAX_DECISION_GAP_MS = 15 * 60_000;  // force a decision check after 15 min of silence
+const COOLDOWN_MS = 30 * 60_000;           // don't re-trade same token within 30 min
+const MIN_HOLD_MS = 30 * 60_000;           // don't sell positions held less than 30 min
 
 // --- Trigger thresholds ---
-const STOP_LOSS_THRESHOLD = -15;            // ROI% to trigger urgent sell check
-const TAKE_PROFIT_THRESHOLD = 40;           // ROI% to trigger profit-taking check
-const HIGH_SCORE_THRESHOLD = 45;            // token score to trigger buy check
+const STOP_LOSS_THRESHOLD = -25;            // ROI% to trigger urgent sell check (only after MIN_HOLD)
+const TAKE_PROFIT_THRESHOLD = 50;           // ROI% to trigger profit-taking check
+const HIGH_SCORE_THRESHOLD = 50;            // token score to trigger buy check
 
 const recentlyTraded = new Map<string, number>();
 let lastDecisionTime = 0;
@@ -36,7 +37,7 @@ export function startPortfolioManager(): void {
     return;
   }
 
-  console.log("[PM] Starting continuous portfolio monitor (scan every 30s, ~5 decisions/hr max)");
+  console.log("[PM] Starting continuous portfolio monitor (scan every 30s, ~4 decisions/hr max, 30m min hold)");
 
   // Initial delay to let scanner populate some data
   setTimeout(() => monitorLoop(), 20_000);
@@ -98,7 +99,7 @@ async function detectTrigger(): Promise<Trigger> {
     // Check holdings for stop-loss / take-profit
     const { data: holdings } = await supabase
       .from("Holding")
-      .select("tokenAddress, amount, avgBuyPrice, totalInvested, token:Token(symbol, currentPrice)");
+      .select("tokenAddress, amount, avgBuyPrice, totalInvested, createdAt, token:Token(symbol, currentPrice)");
 
     if (holdings && holdings.length > 0) {
       for (const h of holdings) {
@@ -109,11 +110,15 @@ async function detectTrigger(): Promise<Trigger> {
         const roi = invested > 0 ? ((currentValue - invested) / invested) * 100 : 0;
         const symbol = (h as any).token?.symbol || "???";
 
+        // Skip positions held less than MIN_HOLD_MS — small losses are just spread
+        const holdMs = Date.now() - new Date((h as any).createdAt || Date.now()).getTime();
+        if (holdMs < MIN_HOLD_MS) continue;
+
         if (roi <= STOP_LOSS_THRESHOLD) {
           return {
             urgent: true,
             opportunity: false,
-            reason: `${symbol} hit stop-loss at ${roi.toFixed(1)}% ROI`,
+            reason: `${symbol} hit stop-loss at ${roi.toFixed(1)}% ROI (held ${Math.round(holdMs / 60_000)}m)`,
           };
         }
 
@@ -524,6 +529,34 @@ async function handleSell(
   symbol: string,
   decision: { reasoning: string; confidence: number; sentiment: string }
 ): Promise<void> {
+  // Hard block: never sell positions held less than MIN_HOLD_MS
+  try {
+    const { data: holding } = await supabase
+      .from("Holding")
+      .select("createdAt")
+      .eq("tokenAddress", tokenAddress)
+      .maybeSingle();
+    if (holding?.createdAt) {
+      const holdMs = Date.now() - new Date(holding.createdAt).getTime();
+      if (holdMs < MIN_HOLD_MS) {
+        const minsHeld = Math.round(holdMs / 60_000);
+        const minsNeeded = Math.round(MIN_HOLD_MS / 60_000);
+        console.log(`[PM] Blocking sell of ${symbol} — only held ${minsHeld}m (min ${minsNeeded}m)`);
+        await logBotAction({
+          action: "THINK",
+          tokenAddress,
+          reasoning: `Blocked SELL ${symbol}: only held ${minsHeld}m, minimum is ${minsNeeded}m. Small losses are normal bonding curve spread — be patient.`,
+          sentiment: "cautious",
+          confidence: decision.confidence,
+          phase: "HOLD",
+        });
+        return;
+      }
+    }
+  } catch {
+    // If we can't check hold time, proceed with sell
+  }
+
   pulse("DECISION", `SELL ${symbol} — ${decision.reasoning}`, {
     action: "SELL",
     token: symbol,
