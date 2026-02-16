@@ -41,6 +41,40 @@ function formatTimeLabel(ts: string, period: string): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+/**
+ * Bucket raw snapshots into time windows and take the last value in each bucket.
+ * This smooths out high-frequency noise (e.g. bonding-curve price oscillations)
+ * while preserving the real trend.
+ */
+function bucketSnapshots(
+  snapshots: { timestamp: string; totalValueMon: string }[],
+  period: string,
+): { timestamp: string; totalValueMon: string }[] {
+  if (snapshots.length <= 2) return snapshots;
+
+  // Bucket size in milliseconds per period
+  const bucketMs: Record<string, number> = {
+    "24h": 30 * 60_000,      // 30 min buckets → ~48 points
+    "7d": 2 * 60 * 60_000,   // 2 hr buckets  → ~84 points
+    "30d": 8 * 60 * 60_000,  // 8 hr buckets  → ~90 points
+    all: 24 * 60 * 60_000,   // 1 day buckets
+  };
+
+  const ms = bucketMs[period] ?? 2 * 60 * 60_000;
+  const buckets = new Map<number, { timestamp: string; totalValueMon: string }>();
+
+  for (const s of snapshots) {
+    const t = new Date(s.timestamp).getTime();
+    const key = Math.floor(t / ms);
+    // Keep the last snapshot in each bucket (most recent value wins)
+    buckets.set(key, s);
+  }
+
+  return Array.from(buckets.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([, v]) => v);
+}
+
 function formatHoverTime(ts: string, period: string): string {
   const d = new Date(ts);
   if (period === "24h") {
@@ -77,12 +111,27 @@ export function PortfolioChart() {
 
   const chartData = useMemo(() => {
     if (!snapshots?.length) return [];
-    return snapshots.map((s) => ({
+    const bucketed = bucketSnapshots(snapshots, period);
+    return bucketed.map((s) => ({
       time: s.timestamp,
       value: parseFloat(s.totalValueMon),
       label: formatTimeLabel(s.timestamp, period),
     }));
   }, [snapshots, period]);
+
+  /* Y-axis domain with padding so small oscillations don't fill the chart */
+  const yDomain = useMemo((): [number, number] | undefined => {
+    if (!chartData.length) return undefined;
+    let min = Infinity;
+    let max = -Infinity;
+    for (const d of chartData) {
+      if (d.value < min) min = d.value;
+      if (d.value > max) max = d.value;
+    }
+    const range = max - min;
+    const padding = Math.max(range * 0.2, max * 0.02);
+    return [Math.max(0, min - padding), max + padding];
+  }, [chartData]);
 
   /* Compute P&L from first→last point (or first→hover) */
   const { displayValue, change, changePercent, isPositive, isNeutral } =
@@ -231,7 +280,7 @@ export function PortfolioChart() {
                 interval="preserveStartEnd"
                 minTickGap={40}
               />
-              <YAxis hide domain={["dataMin", "dataMax"]} />
+              <YAxis hide domain={yDomain ?? ["dataMin", "dataMax"]} />
               <Tooltip
                 content={<EmptyTooltip />}
                 cursor={{
