@@ -44,6 +44,10 @@ Express server that powers the bot's brain and serves the API.
 - `POST /api/bot/action` — Log a bot action (authenticated)
 - `POST /api/bot/thought` — Stream agent thoughts in real-time (authenticated)
 - `GET /api/analytics/*` — Win rate, ROI by token, volume history
+- `POST /api/pitch` — Create a pitch (tokenAddress + message); returns pitch + initial AI reply
+- `POST /api/pitch/:id/message` — Send a message in a pitch; after 3 user messages, AI returns verdict
+- `GET /api/pitch` — Paginated pitch feed (optional status, verdict filters)
+- `GET /api/pitch/:id` — Single pitch with full message history
 
 ### Frontend (`app/`)
 
@@ -99,6 +103,8 @@ Core entities managed by Prisma + PostgreSQL:
 - **BotAction** — Every decision the agent makes (SCAN, EVALUATE, BUY, SELL, SKIP, THINK, ERROR) with reasoning, sentiment, confidence, and phase
 - **PortfolioSnapshot** — Periodic portfolio value snapshots for charting
 - **PriceSnapshot** — Token price history for trend analysis
+- **Pitch** — User pitch sessions (token address, status ACTIVE/COMPLETED, verdict, confidence, watchlisted)
+- **PitchMessage** — Chat messages in a pitch (user/assistant, content); supports multi-turn conversation and AI verdict
 
 ---
 
