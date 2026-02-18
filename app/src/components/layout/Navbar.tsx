@@ -11,6 +11,7 @@ const navLinks = [
   { href: "/portfolio", label: "Portfolio" },
   { href: "/decisions", label: "Decisions" },
   { href: "/tokens", label: "Tokens" },
+  { href: "/pitch", label: "Pitch" },
   { href: "/analytics", label: "Analytics" },
 ];
 

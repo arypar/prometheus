@@ -11,6 +11,7 @@ import activityRoutes from "./routes/activity";
 import scannerRoutes from "./routes/scanner";
 import walletRoutes from "./routes/wallet";
 import pulseRoutes from "./routes/pulse";
+import pitchRoutes from "./routes/pitch";
 
 const app = express();
 
@@ -47,6 +48,9 @@ app.use("/api/bot", botRoutes);
 
 // Scanner routes
 app.use("/api/scanner", scannerRoutes);
+
+// Pitch routes
+app.use("/api/pitch", pitchRoutes);
 
 // Error handler
 app.use(errorHandler);

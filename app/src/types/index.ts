@@ -178,3 +178,31 @@ export interface PulseMessage {
   timestamp: string;
   meta?: Record<string, unknown>;
 }
+
+export interface Pitch {
+  id: string;
+  tokenAddress: string;
+  tokenName: string | null;
+  tokenSymbol: string | null;
+  tokenImageUrl: string | null;
+  status: "ACTIVE" | "COMPLETED";
+  verdict: "BULLISH" | "BEARISH" | "NEUTRAL" | null;
+  confidence: number | null;
+  verdictReasoning: string | null;
+  watchlisted: boolean;
+  messageCount: number;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface PitchMessage {
+  id: string;
+  pitchId: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: string;
+}
+
+export interface PitchWithMessages extends Pitch {
+  messages: PitchMessage[];
+}

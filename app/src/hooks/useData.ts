@@ -17,6 +17,8 @@ import type {
   VolumeData,
   ActivityStats,
   WalletInfo,
+  Pitch,
+  PitchWithMessages,
 } from "@/types";
 
 /*
@@ -105,4 +107,17 @@ export function useActivityStats() {
 
 export function useWalletInfo() {
   return useSWR<WalletInfo>("wallet-info", () => api.getWalletInfo(), SLOW);
+}
+
+export function usePitchFeed(page = 1, status?: string, verdict?: string) {
+  const key = `pitch-feed-${page}-${status}-${verdict}`;
+  return useSWR<PaginatedResponse<Pitch>>(key, () => api.getPitchFeed(page, status, verdict), NORMAL);
+}
+
+export function usePitchDetail(id: string | null) {
+  return useSWR<PitchWithMessages>(
+    id ? `pitch-${id}` : null,
+    () => (id ? api.getPitchDetail(id) : null!),
+    { revalidateOnFocus: false }
+  );
 }

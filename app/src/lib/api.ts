@@ -15,11 +15,27 @@ import type {
   ActivityStats,
   WalletInfo,
   PulseMessage,
+  Pitch,
+  PitchMessage,
+  PitchWithMessages,
 } from "@/types";
 
 async function fetchAPI<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+async function postAPI<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "Request failed" }));
+    throw new Error(err.error || `API error: ${res.status}`);
+  }
   return res.json();
 }
 
@@ -63,4 +79,20 @@ export const api = {
 
   // Pulse feed
   getPulse: () => fetchAPI<PulseMessage[]>("/pulse"),
+
+  // Pitch
+  createPitch: (tokenAddress: string, message: string) =>
+    postAPI<{ pitch: Pitch; messages: PitchMessage[] }>("/pitch", { tokenAddress, message }),
+  sendPitchMessage: (pitchId: string, message: string) =>
+    postAPI<{ message: PitchMessage; verdict?: { sentiment: string; confidence: number; reasoning: string; watchlisted: boolean } }>(
+      `/pitch/${pitchId}/message`,
+      { message }
+    ),
+  getPitchFeed: (page = 1, status?: string, verdict?: string) => {
+    const params = new URLSearchParams({ page: page.toString() });
+    if (status) params.set("status", status);
+    if (verdict) params.set("verdict", verdict);
+    return fetchAPI<PaginatedResponse<Pitch>>(`/pitch?${params}`);
+  },
+  getPitchDetail: (id: string) => fetchAPI<PitchWithMessages>(`/pitch/${id}`),
 };
